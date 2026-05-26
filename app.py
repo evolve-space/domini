@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from secrets import randbits
 
@@ -159,4 +160,4 @@ app = create_app()
 
 if __name__ == "__main__":
     cert_path, key_path = create_self_signed_cert(Path("certs"))
-    app.run(host="localhost", port=8443, ssl_context=(cert_path, key_path))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8443)))
