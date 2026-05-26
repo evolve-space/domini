@@ -17,7 +17,7 @@
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=flat-square)]()
 [![HTTPS](https://img.shields.io/badge/HTTPS-Enabled-blue?style=flat-square&logo=letsencrypt&logoColor=white)]()
 
-*Desarrollado como proyecto de fin de módulo — Máster en Ciberseguridad*
+*Desarrollado como proyecto/herramienta de módulo — Máster en Ciberseguridad*
 
 </div>
 
