@@ -13,12 +13,16 @@ if not SECRET_KEY:
     logging.getLogger(__name__).warning("SECRET_KEY is not set; using an ephemeral key and sessions will not persist across restarts.")
 
 
+_database_url = os.getenv("DATABASE_URL")
+if not _database_url:
+    _instance_dir = BASE_DIR / "instance"
+    _instance_dir.mkdir(exist_ok=True)
+    _database_url = f"sqlite:///{_instance_dir / 'domini.db'}"
+
+
 class Config:
     SECRET_KEY = SECRET_KEY
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL",
-        f"sqlite:///{BASE_DIR / 'instance' / 'domini.db'}",
-    )
+    SQLALCHEMY_DATABASE_URI = _database_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SECURE = True

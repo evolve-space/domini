@@ -148,6 +148,8 @@ def create_app() -> Flask:
     with app.app_context():
         from domini.models import PasswordResetToken  # noqa: F401
 
+        os.makedirs("/tmp/scan_reports", exist_ok=True)
+        os.makedirs(str(Path(app.config.get("SCAN_OUTPUT_DIR", "/tmp/scan_reports"))), exist_ok=True)
         migrate_sqlite_user_columns(Path(__file__).resolve().parent / "instance" / "domini.db")
         db.create_all()
         create_admin_user()
