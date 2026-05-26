@@ -11,3 +11,8 @@ certs/*.key
 instance/
 certs/
 .env
+*.log
+*.sqlite
+*.db-journal
+CLAUDE.md
+.claude/

@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="detail-header">
+    <div>
+        <a class="back-link" href="{{ url_for('dashboard.index') }}" data-i18n="back_dashboard">{{ g.t.back_dashboard }}</a>
+        <span class="eyebrow">{{ target.type }}</span>
+        <h1>{{ target.name }}</h1>
+        <p>{{ g.t.last_scan }}: <span class="mono">{{ scan.started_at.strftime("%Y-%m-%d %H:%M") if scan else "--" }}</span></p>
+        <div class="trend-indicator trend-{{ trend.direction }}" title="{{ g.t.get(trend.label, g.t.no_change) }}">
+            <span>{{ trend.symbol }}</span>
+            <strong data-i18n="trend">{{ g.t.trend }}</strong>
+            <em>{{ g.t.get(trend.label, g.t.no_change) }}</em>
+        </div>
+    </div>
+    <div class="detail-actions">
+        <button class="secondary-button" id="rescan-button" data-target-id="{{ target.id }}" type="button" data-i18n="rescan">{{ g.t.rescan }}</button>
+        <a class="primary-button" href="{{ url_for('dashboard.export_target', target_id=target.id) }}" data-i18n="export_html">{{ g.t.export_html }}</a>
+    </div>
+</section>
+
+{% if correlation_insights %}
+<section class="data-panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow" data-i18n="correlation_signals">{{ g.t.correlation_signals }}</span>
+            <h2 data-i18n="correlation_signals">{{ g.t.correlation_signals }}</h2>
+        </div>
+        <span class="status-badge">{{ correlation_insights|length }}</span>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th data-i18n="severity">{{ g.t.severity }}</th>
+                    <th data-i18n="confidence">{{ g.t.confidence }}</th>
+                    <th data-i18n="sources">{{ g.t.sources }}</th>
+                    <th data-i18n="description">{{ g.t.description }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for insight in correlation_insights %}
+                    <tr>
+                        <td><span class="severity severity-{{ insight.severity }}">{{ insight.severity }}</span></td>
+                        <td>{{ insight.confidence }}</td>
+                        <td class="mono">{{ insight.sources|join(", ") }}</td>
+                        <td>{{ insight.message }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
+<section class="detail-grid">
+    <article class="score-panel">
+        {% set score = scan.risk_score if scan and scan.risk_score is not none else 0 %}
+        {% set offset = 314 - (314 * score / 100) %}
+        <div class="score-ring" style="--score-offset: {{ offset }};">
+            <svg viewBox="0 0 120 120" role="img" aria-label="{{ g.t.score }} {{ score }}">
+                <circle class="ring-bg" cx="60" cy="60" r="50"></circle>
+                <circle class="ring-fg" cx="60" cy="60" r="50"></circle>
+            </svg>
+            <div class="score-center">
+                <strong class="mono">{{ score }}</strong>
+                <span>/100</span>
+            </div>
+        </div>
+    </article>
+
+    <article class="findings-panel">
+        <div class="panel-header compact">
+            <h2 data-i18n="findings">{{ g.t.findings }}</h2>
+            <span class="status-badge">{{ findings|length }}</span>
+        </div>
+        <div class="findings-list">
+            {% for finding in findings %}
+                <div class="finding">
+                    <span class="severity severity-{{ finding.severity }}">{{ finding.severity }}</span>
+                    <strong>{{ finding.source }}</strong>
+                    <p>{{ finding.message }}</p>
+                </div>
+            {% else %}
+                <p class="muted" data-i18n="no_findings">{{ g.t.no_findings }}</p>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="data-panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow" data-i18n="embedded_report">{{ g.t.embedded_report }}</span>
+            <h2>{{ report_title }}</h2>
+        </div>
+    </div>
+    {% if scan and report_available %}
+        <iframe class="report-frame" src="{{ url_for('dashboard.embedded_report', scan_id=scan.id) }}" title="{{ g.t.embedded_report }}"></iframe>
+    {% else %}
+        <pre class="raw-json">{{ raw_json }}</pre>
+    {% endif %}
+</section>
+
+<section class="data-panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow" data-i18n="trend">{{ g.t.trend }}</span>
+            <h2 data-i18n="scan_history">{{ g.t.scan_history }}</h2>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th data-i18n="last_scan">{{ g.t.last_scan }}</th>
+                    <th data-i18n="score">{{ g.t.score }}</th>
+                    <th data-i18n="trend">{{ g.t.trend }}</th>
+                    <th data-i18n="duration">{{ g.t.duration }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in history %}
+                    <tr>
+                        <td class="mono">{{ row.scan.started_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                        <td><span class="score-badge score-{{ 'high' if (row.scan.risk_score or 0) >= 60 else 'medium' if (row.scan.risk_score or 0) >= 30 else 'low' }}">{{ row.scan.risk_score if row.scan.risk_score is not none else "--" }}</span></td>
+                        <td>
+                            <span class="change change-{{ row.change.direction }}">
+                                {% if row.change.direction == "equal" %}
+                                    {{ g.t.no_change }}
+                                {% else %}
+                                    {{ row.change.text }} · {{ g.t.get(row.change.label, g.t.no_change) }}
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td class="mono">{{ row.duration }}</td>
+                    </tr>
+                {% else %}
+                    <tr class="empty-row">
+                        <td colspan="4" data-i18n="empty_metric">{{ g.t.empty_metric }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="chart-panel">
+        <h3 data-i18n="risk_evolution">{{ g.t.risk_evolution }}</h3>
+        <canvas id="risk-chart" data-chart='{{ chart_data | tojson }}' aria-label="{{ g.t.risk_evolution }}"></canvas>
+    </div>
+</section>
+
+{% if target.type == "domain" and sentinel_cards %}
+<section class="data-panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow">SENTINEL</span>
+            <h2 data-i18n="sentinel_ip_analysis">{{ g.t.sentinel_ip_analysis }}</h2>
+        </div>
+        <span class="status-badge">{{ sentinel_cards|length }}</span>
+    </div>
+    <div class="sentinel-grid">
+        {% for item in sentinel_cards %}
+            <article class="sentinel-card">
+                <div class="sentinel-card-header">
+                    <strong class="mono">{{ item.ip }}</strong>
+                    <span class="score-badge score-{{ item.score_severity }}">{{ item.score }}</span>
+                </div>
+                <dl class="sentinel-facts">
+                    <div>
+                        <dt data-i18n="country">{{ g.t.country }}</dt>
+                        <dd>{{ item.country }}</dd>
+                    </div>
+                    <div>
+                        <dt>ASN</dt>
+                        <dd>{{ item.asn }}</dd>
+                    </div>
+                    <div>
+                        <dt>Tor</dt>
+                        <dd>{{ g.t.yes if item.is_tor else g.t.no }}</dd>
+                    </div>
+                    <div>
+                        <dt data-i18n="open_ports">{{ g.t.open_ports }}</dt>
+                        <dd>{{ item.port_count }}</dd>
+                    </div>
+                </dl>
+                <div class="ports-list">
+                    {% for port in item.open_ports %}
+                        <span class="port-chip mono">{{ port.port }}/{{ port.protocol }} {{ port.service }}</span>
+                    {% else %}
+                        <span class="muted" data-i18n="no_open_ports">{{ g.t.no_open_ports }}</span>
+                    {% endfor %}
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if target.type == "domain" %}
+<section class="data-panel collapsible-panel">
+    <details open>
+        <summary>
+            <span data-i18n="shadow_it_detected">{{ g.t.shadow_it_detected }}</span>
+            <span class="status-badge">{{ shadow_it_findings|length }}</span>
+        </summary>
+        {% if shadow_it_findings %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th data-i18n="type">{{ g.t.type }}</th>
+                            <th data-i18n="value">{{ g.t.value }}</th>
+                            <th data-i18n="risk">{{ g.t.risk }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for finding in shadow_it_findings %}
+                            <tr>
+                                <td>{{ g.t.get(finding.type, finding.type) }}</td>
+                                <td class="mono">{{ finding.value }}</td>
+                                <td><span class="severity severity-{{ finding.risk }}">{{ finding.risk }}</span></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="muted empty-note" data-i18n="no_detected_findings">{{ g.t.no_detected_findings }}</p>
+        {% endif %}
+    </details>
+</section>
+
+<section class="data-panel collapsible-panel">
+    <details open>
+        <summary>
+            <span data-i18n="supply_chain">{{ g.t.supply_chain }}</span>
+            <span class="status-badge">{{ supply_chain_findings|length }}</span>
+        </summary>
+        {% if supply_chain_findings %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th data-i18n="provider">{{ g.t.provider }}</th>
+                            <th data-i18n="type">{{ g.t.type }}</th>
+                            <th data-i18n="risk">{{ g.t.risk }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for finding in supply_chain_findings %}
+                            <tr>
+                                <td>{{ finding.provider }}</td>
+                                <td>{{ finding.type }}</td>
+                                <td><span class="severity severity-{{ finding.risk }}">{{ finding.risk }}</span></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="muted empty-note" data-i18n="no_detected_findings">{{ g.t.no_detected_findings }}</p>
+        {% endif %}
+    </details>
+</section>
+
+<section class="data-panel collapsible-panel">
+    <details open>
+        <summary>
+            <span data-i18n="exposed_secrets">{{ g.t.exposed_secrets }}</span>
+            <span class="status-badge">{{ exposed_secret_findings|length }}</span>
+        </summary>
+        {% if exposed_secret_findings %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>GitHub</th>
+                            <th data-i18n="secret_type">{{ g.t.secret_type }}</th>
+                            <th data-i18n="severity">{{ g.t.severity }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for finding in exposed_secret_findings %}
+                            <tr>
+                                <td><a class="target-link" href="{{ finding.url }}" target="_blank" rel="noopener noreferrer">{{ finding.url }}</a></td>
+                                <td>{{ finding.secret_type }}</td>
+                                <td><span class="severity severity-{{ finding.severity }}">{{ finding.severity }}</span></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="muted empty-note" data-i18n="no_detected_findings">{{ g.t.no_detected_findings }}</p>
+        {% endif %}
+    </details>
+</section>
+{% endif %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const riskCanvas = document.getElementById("risk-chart");
+    if (riskCanvas && window.Chart) {
+        const chartData = JSON.parse(riskCanvas.dataset.chart || '{"labels":[],"scores":[]}');
+        const context = riskCanvas.getContext("2d");
+        const gradient = context.createLinearGradient(0, 0, riskCanvas.clientWidth || 600, 0);
+        gradient.addColorStop(0, "#0066ff");
+        gradient.addColorStop(1, "#00d4ff");
+        new Chart(context, {
+            type: "line",
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    data: chartData.scores,
+                    borderColor: gradient,
+                    backgroundColor: "rgba(0, 212, 255, 0.12)",
+                    pointBackgroundColor: "#00d4ff",
+                    pointBorderColor: "#edf4ff",
+                    pointRadius: 4,
+                    tension: 0.32,
+                    fill: true,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                },
+                scales: {
+                    x: {
+                        ticks: { color: "#8b98a9" },
+                        grid: { color: "rgba(148, 163, 184, 0.12)" },
+                    },
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: { color: "#8b98a9" },
+                        grid: { color: "rgba(148, 163, 184, 0.12)" },
+                    },
+                },
+            },
+        });
+    }
+</script>
+{% endblock %}

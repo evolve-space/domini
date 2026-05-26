@@ -1,17 +1,97 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="panel">
-    <h1>{{ g.t.welcome }}</h1>
-    <div class="tools">
-        <article class="tool">
-            <h2>DOMINUS</h2>
-            <p>{{ g.t.dominus }}</p>
-        </article>
-        <article class="tool">
-            <h2>SENTINEL</h2>
-            <p>{{ g.t.sentinel }}</p>
-        </article>
+<section class="hero">
+    <div>
+        <span class="eyebrow" data-i18n="hero_kicker">{{ g.t.hero_kicker }}</span>
+        <h1 data-i18n="welcome" data-i18n-username="{{ current_user.username }}">{{ g.t.welcome.format(username=current_user.username) }}</h1>
+        <p data-i18n="hero_text">{{ g.t.hero_text }}</p>
+    </div>
+    <form class="scan-form" id="scan-form">
+        <input id="scan-target" name="target" type="text" placeholder="{{ g.t.scan_placeholder }}" data-i18n-placeholder="scan_placeholder" aria-label="{{ g.t.scan_target }}">
+        <button class="primary-button hero-button" type="submit" title="{{ g.t.new_scan_tooltip }}" data-i18n="launch_scan" data-i18n-title="new_scan_tooltip">{{ g.t.launch_scan }}</button>
+    </form>
+</section>
+
+<section class="scan-status-panel" id="scan-status-panel" hidden>
+    <div>
+        <span class="eyebrow" data-i18n="scan_status">{{ g.t.scan_status }}</span>
+        <strong id="scan-status-text" data-i18n="queued">{{ g.t.queued }}</strong>
+    </div>
+    <span class="status-badge" id="scan-phase"></span>
+</section>
+
+<section class="metrics-grid" aria-label="{{ g.t.dashboard }}">
+    <article class="metric-card">
+        <span class="metric-label" data-i18n="monitored_targets">{{ g.t.monitored_targets }}</span>
+        <strong class="metric-value mono">{{ target_count }}</strong>
+        <span class="metric-note" data-i18n="targets_metric_note">{{ g.t.targets_metric_note }}</span>
+    </article>
+    <article class="metric-card">
+        <span class="metric-label" data-i18n="completed_scans">{{ g.t.completed_scans }}</span>
+        <strong class="metric-value mono">{{ completed_count }}</strong>
+        <span class="metric-note" data-i18n="completed_metric_note">{{ g.t.completed_metric_note }}</span>
+    </article>
+    <article class="metric-card">
+        <span class="metric-label" data-i18n="active_alerts">{{ g.t.active_alerts }}</span>
+        <strong class="metric-value mono">{{ active_alerts }}</strong>
+        <span class="metric-note" data-i18n="alerts_metric_note">{{ g.t.alerts_metric_note }}</span>
+    </article>
+    <article class="metric-card">
+        <span class="metric-label" data-i18n="average_score">{{ g.t.average_score }}</span>
+        <strong class="metric-value mono">{{ average_score if average_score is not none else "--" }}</strong>
+        <span class="metric-note" data-i18n="score_metric_note">{{ g.t.score_metric_note }}</span>
+    </article>
+</section>
+
+<section class="data-panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow" data-i18n="recent_targets">{{ g.t.recent_targets }}</span>
+            <h2 data-i18n="recent_targets">{{ g.t.recent_targets }}</h2>
+        </div>
+        <span class="status-badge">{{ latest_target_rows|length }}</span>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th data-i18n="target">{{ g.t.target }}</th>
+                    <th data-i18n="type">{{ g.t.type }}</th>
+                    <th data-i18n="last_scan">{{ g.t.last_scan }}</th>
+                    <th data-i18n="status">{{ g.t.status }}</th>
+                    <th data-i18n="score">{{ g.t.score }}</th>
+                    <th data-i18n="actions">{{ g.t.actions }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in latest_target_rows %}
+                {% set scan = row.scan %}
+                {% set trend = row.trend %}
+                <tr class="clickable-row" data-href="{{ url_for('dashboard.target_detail', target_id=scan.target_id) }}">
+                    <td><a class="target-link" href="{{ url_for('dashboard.target_detail', target_id=scan.target_id) }}">{{ scan.target.name }}</a></td>
+                    <td><span class="status-badge">{{ scan.target.type }}</span></td>
+                    <td class="mono">{{ scan.started_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                    <td><span class="state state-{{ scan.status }}">{{ g.t.get(scan.status, scan.status) }}</span></td>
+                    <td>
+                        <span class="score-badge score-{{ 'high' if (scan.risk_score or 0) >= 60 else 'medium' if (scan.risk_score or 0) >= 30 else 'low' }}">
+                            {{ scan.risk_score if scan.risk_score is not none else "--" }}
+                            <span class="trend trend-{{ trend.direction }}">{{ trend.symbol }}</span>
+                        </span>
+                    </td>
+                    <td><a class="secondary-button" href="{{ url_for('dashboard.target_detail', target_id=scan.target_id) }}" data-i18n="open_detail">{{ g.t.open_detail }}</a></td>
+                </tr>
+                {% else %}
+                <tr class="empty-row">
+                    <td colspan="6">
+                        <strong data-i18n="empty_table_title">{{ g.t.empty_table_title }}</strong>
+                        <span data-i18n="empty_table_text">{{ g.t.empty_table_text }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </section>
 {% endblock %}

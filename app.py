@@ -1,10 +1,13 @@
 from pathlib import Path
+from secrets import randbits
 
 from OpenSSL import crypto
-from flask import Flask, g, request
+from flask import Flask, g, jsonify, request, session
 
 from config import Config, TRANSLATIONS
 from domini.extensions import bcrypt, db, login_manager
+from domini.extensions import migrate_sqlite_user_columns
+from translations import LANGUAGES
 
 
 def create_self_signed_cert(cert_dir: Path) -> tuple[str, str]:
@@ -12,7 +15,7 @@ def create_self_signed_cert(cert_dir: Path) -> tuple[str, str]:
     cert_file = cert_dir / "domini.crt"
     key_file = cert_dir / "domini.key"
 
-    if cert_file.exists() and key_file.exists():
+    if cert_file.exists() and key_file.exists() and certificate_is_valid(cert_file):
         return str(cert_file), str(key_file)
 
     key = crypto.PKey()
@@ -26,11 +29,19 @@ def create_self_signed_cert(cert_dir: Path) -> tuple[str, str]:
     subject.O = "DOMINI"
     subject.OU = "OSINT"
     subject.CN = "localhost"
-    cert.set_serial_number(1000)
+    cert.set_serial_number(randbits(128))
     cert.gmtime_adj_notBefore(0)
-    cert.gmtime_adj_notAfter(365 * 24 * 60 * 60)
+    cert.gmtime_adj_notAfter(825 * 24 * 60 * 60)
     cert.set_issuer(subject)
     cert.set_pubkey(key)
+    cert.add_extensions(
+        [
+            crypto.X509Extension(b"subjectAltName", False, b"DNS:localhost,IP:127.0.0.1"),
+            crypto.X509Extension(b"basicConstraints", True, b"CA:FALSE"),
+            crypto.X509Extension(b"keyUsage", True, b"digitalSignature,keyEncipherment"),
+            crypto.X509Extension(b"extendedKeyUsage", False, b"serverAuth"),
+        ]
+    )
     cert.sign(key, "sha256")
 
     cert_file.write_bytes(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
@@ -38,8 +49,28 @@ def create_self_signed_cert(cert_dir: Path) -> tuple[str, str]:
     return str(cert_file), str(key_file)
 
 
+def certificate_is_valid(cert_file: Path) -> bool:
+    try:
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_file.read_bytes())
+    except crypto.Error:
+        return False
+
+    subject = cert.get_subject()
+    if subject.CN != "localhost":
+        return False
+    if cert.get_pubkey().bits() != 2048:
+        return False
+
+    san_values = set()
+    for index in range(cert.get_extension_count()):
+        extension = cert.get_extension(index)
+        if extension.get_short_name() == b"subjectAltName":
+            san_values.update(part.strip() for part in str(extension).split(","))
+    return {"DNS:localhost", "IP Address:127.0.0.1"}.issubset(san_values)
+
+
 def create_admin_user() -> None:
-    from domini.models.user import User
+    from domini.models import Alert, PasswordResetToken, Scan, Target, User  # noqa: F401
 
     admin = User.query.filter_by(username=Config.ADMIN_USERNAME).first()
     if admin:
@@ -64,9 +95,10 @@ def create_app() -> Flask:
     bcrypt.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
-    login_manager.login_message = TRANSLATIONS["es"]["login_required"]
+    login_manager.login_message = "login_required"
 
     from domini.auth.routes import auth_bp
+    from domini.auth.routes import get_csrf_token
     from domini.dashboard.routes import dashboard_bp
     from domini.models.user import User
 
@@ -76,14 +108,46 @@ def create_app() -> Flask:
 
     @app.before_request
     def set_locale() -> None:
-        lang = request.args.get("lang") or request.cookies.get("lang") or Config.DEFAULT_LANG
+        requested_lang = request.args.get("lang")
+        if requested_lang in TRANSLATIONS:
+            session["lang"] = requested_lang
+        lang = session.get("lang") or Config.DEFAULT_LANG
         g.lang = lang if lang in TRANSLATIONS else Config.DEFAULT_LANG
         g.t = TRANSLATIONS[g.lang]
+
+    @app.context_processor
+    def inject_i18n() -> dict:
+        return {
+            "translations": TRANSLATIONS,
+            "languages": LANGUAGES,
+        }
+
+    app.jinja_env.globals["csrf_token"] = get_csrf_token
+
+    @app.after_request
+    def add_security_headers(response):
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        if not app.debug:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+    @app.post("/i18n/<lang>")
+    def set_language(lang: str):
+        if lang not in TRANSLATIONS:
+            return jsonify({"error": "unsupported_language"}), 400
+        session["lang"] = lang
+        return jsonify({"lang": lang, "translations": TRANSLATIONS[lang]})
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
 
     with app.app_context():
+        from domini.models import PasswordResetToken  # noqa: F401
+
+        migrate_sqlite_user_columns(Path(__file__).resolve().parent / "instance" / "domini.db")
         db.create_all()
         create_admin_user()
 

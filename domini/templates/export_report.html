@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="{{ g.lang }}">
+<head>
+    <meta charset="utf-8">
+    <title>DOMINI - {{ target.name }}</title>
+    <style>
+        body { margin: 0; padding: 32px; background: #080b10; color: #edf4ff; font-family: Inter, Arial, sans-serif; }
+        .mono, pre { font-family: "JetBrains Mono", Menlo, monospace; }
+        .header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 1px solid #273241; padding-bottom: 24px; }
+        h1 { margin: 0 0 8px; font-size: 38px; }
+        .score { font-size: 44px; font-weight: 800; }
+        .finding { margin: 14px 0; padding: 14px; border: 1px solid #273241; border-radius: 8px; background: #0d1117; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; background: #17304a; color: #8bdcff; font-size: 12px; font-weight: 800; text-transform: uppercase; }
+        .severity-low { color: #8bdcff; background: rgba(0, 212, 255, 0.14); }
+        .severity-medium { color: #ffe39a; background: rgba(245, 158, 11, 0.16); }
+        .severity-high { color: #ffbf8a; background: rgba(249, 115, 22, 0.18); }
+        .severity-critical { color: #ffb3bd; background: rgba(255, 107, 122, 0.16); }
+        table { width: 100%; margin: 14px 0 28px; border-collapse: collapse; background: #0d1117; }
+        th, td { padding: 12px; border: 1px solid #273241; text-align: left; vertical-align: top; }
+        th { color: #8bdcff; text-transform: uppercase; font-size: 12px; }
+        pre { overflow: auto; padding: 18px; border-radius: 8px; background: #0d1117; color: #c7d2e3; }
+    </style>
+</head>
+<body>
+    <section class="header">
+        <div>
+            <h1>{{ target.name }}</h1>
+            <div>{{ target.type }} · {{ scan.started_at.strftime("%Y-%m-%d %H:%M") }}</div>
+        </div>
+        <div class="score mono">{{ scan.risk_score if scan.risk_score is not none else 0 }}/100</div>
+    </section>
+    {% if correlation_insights %}
+        <h2>{{ g.t.correlation_signals }}</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>{{ g.t.severity }}</th>
+                    <th>{{ g.t.confidence }}</th>
+                    <th>{{ g.t.sources }}</th>
+                    <th>{{ g.t.description }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for insight in correlation_insights %}
+                    <tr>
+                        <td><span class="badge severity-{{ insight.severity }}">{{ insight.severity }}</span></td>
+                        <td>{{ insight.confidence }}</td>
+                        <td class="mono">{{ insight.sources|join(", ") }}</td>
+                        <td>{{ insight.message }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+    <h2>{{ g.t.findings }}</h2>
+    {% for finding in findings %}
+        <article class="finding">
+            <span class="badge severity-{{ finding.severity }}">{{ finding.severity }}</span>
+            <h3>{{ finding.source }}</h3>
+            <p>{{ finding.message }}</p>
+        </article>
+    {% else %}
+        <p>{{ g.t.no_findings }}</p>
+    {% endfor %}
+    <h2>JSON</h2>
+    <pre>{{ raw_json }}</pre>
+</body>
+</html>

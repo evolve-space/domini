@@ -1,69 +1,35 @@
 import os
+import logging
+import secrets
 from pathlib import Path
+
+from translations import TRANSLATIONS
 
 
 BASE_DIR = Path(__file__).resolve().parent
-
-
-TRANSLATIONS = {
-    "es": {
-        "app_name": "DOMINI",
-        "login": "Iniciar sesion",
-        "logout": "Cerrar sesion",
-        "register": "Registrar usuario",
-        "username": "Usuario",
-        "password": "Contrasena",
-        "dashboard": "Panel",
-        "welcome": "Bienvenido a DOMINI",
-        "dominus": "DOMINUS - reconocimiento de dominios",
-        "sentinel": "SENTINEL - inteligencia de IPs",
-        "invalid_credentials": "Usuario o contrasena invalidos",
-        "user_exists": "El usuario ya existe",
-        "user_created": "Usuario creado correctamente",
-        "login_required": "Debes iniciar sesion para acceder",
-    },
-    "en": {
-        "app_name": "DOMINI",
-        "login": "Sign in",
-        "logout": "Sign out",
-        "register": "Register user",
-        "username": "Username",
-        "password": "Password",
-        "dashboard": "Dashboard",
-        "welcome": "Welcome to DOMINI",
-        "dominus": "DOMINUS - domain reconnaissance",
-        "sentinel": "SENTINEL - IP intelligence",
-        "invalid_credentials": "Invalid username or password",
-        "user_exists": "User already exists",
-        "user_created": "User created successfully",
-        "login_required": "Please sign in to access this page",
-    },
-    "ru": {
-        "app_name": "DOMINI",
-        "login": "Войти",
-        "logout": "Выйти",
-        "register": "Регистрация пользователя",
-        "username": "Пользователь",
-        "password": "Пароль",
-        "dashboard": "Панель",
-        "welcome": "Добро пожаловать в DOMINI",
-        "dominus": "DOMINUS - разведка доменов",
-        "sentinel": "SENTINEL - разведка IP",
-        "invalid_credentials": "Неверное имя пользователя или пароль",
-        "user_exists": "Пользователь уже существует",
-        "user_created": "Пользователь создан",
-        "login_required": "Войдите, чтобы открыть эту страницу",
-    },
-}
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    SECRET_KEY = secrets.token_hex(32)
+    logging.getLogger(__name__).warning("SECRET_KEY is not set; using an ephemeral key and sessions will not persist across restarts.")
 
 
 class Config:
-    SECRET_KEY = os.getenv("SECRET_KEY", "change-this-secret-key")
+    SECRET_KEY = SECRET_KEY
     SQLALCHEMY_DATABASE_URI = os.getenv(
         "DATABASE_URL",
         f"sqlite:///{BASE_DIR / 'instance' / 'domini.db'}",
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = "Lax"
     DEFAULT_LANG = os.getenv("DEFAULT_LANG", "es")
     ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "domini2024")
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+    DOMINUS_DIR = Path(os.getenv("DOMINUS_DIR", str(Path.home() / "dominus")))
+    SENTINEL_DIR = Path(os.getenv("SENTINEL_DIR", str(Path.home() / "sentinel")))
+    DOMINUS_PYTHON = os.getenv("DOMINUS_PYTHON", str(DOMINUS_DIR / ".venv" / "bin" / "python"))
+    SENTINEL_PYTHON = os.getenv("SENTINEL_PYTHON", str(SENTINEL_DIR / ".venv" / "bin" / "python"))
+    SCAN_OUTPUT_DIR = Path(os.getenv("SCAN_OUTPUT_DIR", str(BASE_DIR / "instance" / "scan_reports")))
+    LOGIN_RATE_LIMIT_ATTEMPTS = 10
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS = 300

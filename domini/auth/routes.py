@@ -1,11 +1,65 @@
-from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from __future__ import annotations
+
+import hashlib
+import re
+import secrets
+from datetime import datetime, timezone
+
+from flask import Blueprint, abort, flash, g, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
+from config import Config
 from domini.extensions import db
+from domini.models.token import PasswordResetToken
 from domini.models.user import User
-
+from domini.utils.mailer import send_reset_email
 
 auth_bp = Blueprint("auth", __name__)
+USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
+EMAIL_RE = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
+LOGIN_ATTEMPTS: dict[str, list[datetime]] = {}
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def get_csrf_token() -> str:
+    if "csrf_token" not in session:
+        session["csrf_token"] = secrets.token_hex(32)
+    return session["csrf_token"]
+
+
+def require_csrf() -> None:
+    expected = session.get("csrf_token")
+    submitted = request.form.get("csrf_token")
+    if not expected or not submitted or not secrets.compare_digest(submitted, expected):
+        abort(403)
+
+
+def valid_password(password: str) -> bool:
+    return len(password) >= 8 and any(character.isalpha() for character in password) and any(character.isdigit() for character in password)
+
+
+def remote_ip() -> str:
+    return request.remote_addr or "unknown"
+
+
+def current_ip_attempts() -> list[datetime]:
+    cutoff = utcnow().timestamp() - Config.LOGIN_RATE_LIMIT_WINDOW_SECONDS
+    attempts = [timestamp for timestamp in LOGIN_ATTEMPTS.get(remote_ip(), []) if timestamp.timestamp() > cutoff]
+    LOGIN_ATTEMPTS[remote_ip()] = attempts
+    return attempts
+
+
+def locked_minutes(user: User) -> int:
+    locked_until = user.locked_until
+    if locked_until is None:
+        return 0
+    if locked_until.tzinfo is None:
+        locked_until = locked_until.replace(tzinfo=timezone.utc)
+    seconds = max(0, int((locked_until - utcnow()).total_seconds()))
+    return max(1, (seconds + 59) // 60)
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -14,13 +68,28 @@ def login():
         return redirect(url_for("dashboard.index"))
 
     if request.method == "POST":
+        require_csrf()
+        if len(current_ip_attempts()) >= Config.LOGIN_RATE_LIMIT_ATTEMPTS:
+            flash(g.t["account_locked"].format(minutes=5), "error")
+            return render_template("login.html")
+
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         user = User.query.filter_by(username=username).first()
+        if user and user.is_locked():
+            flash(g.t["account_locked"].format(minutes=locked_minutes(user)), "error")
+            return render_template("login.html")
         if user and user.check_password(password):
+            user.reset_failed_attempts()
+            db.session.commit()
+            LOGIN_ATTEMPTS.pop(remote_ip(), None)
             login_user(user)
             return redirect(url_for("dashboard.index"))
-        flash(g.t["invalid_credentials"], "error")
+        if user:
+            user.register_failed_attempt()
+            db.session.commit()
+        current_ip_attempts().append(utcnow())
+        flash("invalid_credentials", "error")
 
     return render_template("login.html")
 
@@ -33,19 +102,72 @@ def logout():
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
-@login_required
 def register():
     if request.method == "POST":
+        require_csrf()
         username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
-        if User.query.filter_by(username=username).first():
-            flash(g.t["user_exists"], "error")
-        elif username and password:
-            user = User(username=username)
+        confirmation = request.form.get("password_confirm", "")
+        if not USERNAME_RE.fullmatch(username):
+            flash("invalid_username_format", "error")
+        elif not EMAIL_RE.fullmatch(email):
+            flash("invalid_email_format", "error")
+        elif not valid_password(password):
+            flash("weak_password", "error")
+        elif password != confirmation:
+            flash("passwords_dont_match", "error")
+        elif User.query.filter_by(username=username).first():
+            flash("username_taken", "error")
+        elif User.query.filter_by(email=email).first():
+            flash("email_taken", "error")
+        else:
+            user = User(username=username, email=email)
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
-            flash(g.t["user_created"], "success")
+            login_user(user)
             return redirect(url_for("dashboard.index"))
 
     return render_template("login.html", register_mode=True)
+
+
+@auth_bp.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        require_csrf()
+        email = request.form.get("email", "").strip().lower()
+        user = User.query.filter_by(email=email).first()
+        if user:
+            token, raw_token = PasswordResetToken.create_for_user(user.id)
+            db.session.add(token)
+            db.session.commit()
+            send_reset_email(user.email, raw_token, request.url_root.rstrip("/"))
+        flash("reset_email_sent", "success")
+    return render_template("forgot_password.html")
+
+
+@auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token: str):
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    reset_token = PasswordResetToken.query.filter_by(token_hash=token_hash).first()
+    if not reset_token or not reset_token.is_valid():
+        flash("reset_token_invalid", "error")
+        return redirect(url_for("auth.forgot_password"))
+
+    if request.method == "POST":
+        require_csrf()
+        password = request.form.get("password", "")
+        confirmation = request.form.get("password_confirm", "")
+        if not valid_password(password):
+            flash("weak_password", "error")
+        elif password != confirmation:
+            flash("passwords_dont_match", "error")
+        else:
+            reset_token.user.set_password(password)
+            reset_token.user.reset_failed_attempts()
+            reset_token.used = True
+            db.session.commit()
+            flash("password_reset_success", "success")
+            return redirect(url_for("auth.login"))
+    return render_template("reset_password.html", token=token)
