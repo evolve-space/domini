@@ -73,6 +73,9 @@ def certificate_is_valid(cert_file: Path) -> bool:
 def create_admin_user() -> None:
     from domini.models import Alert, PasswordResetToken, Scan, Target, User  # noqa: F401
 
+    if not Config.ADMIN_USERNAME or not Config.ADMIN_PASSWORD:
+        return
+
     admin = User.query.filter_by(username=Config.ADMIN_USERNAME).first()
     if admin:
         return
