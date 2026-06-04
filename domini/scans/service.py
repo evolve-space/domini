@@ -250,7 +250,7 @@ def create_alerts(scan: Scan, payload: dict[str, Any]) -> None:
                 target_id=scan.target_id,
                 scan_id=scan.id,
                 severity=severity,
-                message=f"Risk score {score}/100 for {scan.target.name}",
+                message=f"Score de riesgo {score}/100 para {scan.target.name}",
             )
         )
     previous_scan = (
@@ -274,22 +274,22 @@ def create_alerts(scan: Scan, payload: dict[str, Any]) -> None:
         add_alert(
             scan,
             severity="high" if score_delta >= 10 else "medium",
-            message=f"Risk score increased from {previous_score} to {score} (+{score_delta})",
+            message=f"El score de riesgo aumentó de {previous_score} a {score} (+{score_delta})",
         )
 
     for port in sorted(open_ports(payload) - open_ports(previous_payload)):
         if port in HIGH_RISK_PORTS:
-            add_alert(scan, severity="high", message=f"New high-risk port detected: {port}")
+            add_alert(scan, severity="high", message=f"Nuevo puerto de alto riesgo detectado: {port}")
         else:
-            add_alert(scan, severity="low", message=f"New open port detected: {port}")
+            add_alert(scan, severity="low", message=f"Nuevo puerto abierto detectado: {port}")
 
     previous_dmarc = dmarc_record(previous_payload)
     current_dmarc = dmarc_record(payload)
     if dmarc_is_enforced(previous_dmarc) and (not current_dmarc or dmarc_policy_is_none(current_dmarc)):
-        add_alert(scan, severity="high", message="DMARC policy weakened or removed")
+        add_alert(scan, severity="high", message="La política DMARC se debilitó o fue eliminada")
 
     if spf_record(previous_payload) and not spf_record(payload):
-        add_alert(scan, severity="high", message="SPF record removed")
+        add_alert(scan, severity="high", message="El registro SPF fue eliminado")
 
     previous_subdomains = subdomain_count(previous_payload)
     current_subdomains = subdomain_count(payload)
@@ -297,7 +297,7 @@ def create_alerts(scan: Scan, payload: dict[str, Any]) -> None:
         add_alert(
             scan,
             severity="medium",
-            message=f"Subdomain count increased from {previous_subdomains} to {current_subdomains}",
+            message=f"La cantidad de subdominios aumentó de {previous_subdomains} a {current_subdomains}",
         )
 
 
@@ -387,22 +387,22 @@ def scan_payload(scan: Scan) -> dict[str, Any]:
 
 def finding_severity(phase: str, reason: str) -> str:
     normalized = reason.lower()
-    if "high-risk port" in normalized:
+    if "puerto de alto riesgo" in normalized:
         return "high"
-    if normalized in {"missing strict-transport-security", "missing content-security-policy"}:
+    if normalized in {"falta la cabecera strict-transport-security", "falta la cabecera content-security-policy"}:
         return "high"
-    expiration = re.search(r"expires in (-?\d+) days", normalized)
+    expiration = re.search(r"expira en (-?\d+) d", normalized)
     if expiration and int(expiration.group(1)) < 30:
         return "high"
-    if "dmarc policy is p=none" in normalized:
+    if "dmarc" in normalized and "p=none" in normalized:
         return "medium"
     if "spf" in normalized:
         return "medium"
-    if normalized == "missing x-frame-options":
+    if normalized == "falta la cabecera x-frame-options":
         return "medium"
-    if "non-web ports open" in normalized:
+    if "puertos no web" in normalized:
         return "medium"
-    subdomains = re.search(r"(\d+) subdomains exposed", normalized)
+    subdomains = re.search(r"(\d+) subdominios expuestos", normalized)
     if subdomains and int(subdomains.group(1)) > 20:
         return "medium"
     return "low"
@@ -496,144 +496,145 @@ def correlation_insights(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return payload.get("correlation") or []
 
 
+# Keys are in Spanish (canonical language from scoring.py). Values provide EN/RU translations.
 FINDING_TRANSLATIONS = {
-    "Missing content-security-policy": {
-        "es": "Falta la cabecera Content-Security-Policy",
+    "Falta la cabecera Content-Security-Policy": {
+        "en": "Missing content-security-policy",
         "ru": "Отсутствует заголовок Content-Security-Policy",
     },
-    "Missing strict-transport-security": {
-        "es": "Falta la cabecera Strict-Transport-Security",
+    "Falta la cabecera Strict-Transport-Security": {
+        "en": "Missing strict-transport-security",
         "ru": "Отсутствует заголовок Strict-Transport-Security",
     },
-    "Missing x-frame-options": {
-        "es": "Falta la cabecera X-Frame-Options",
+    "Falta la cabecera X-Frame-Options": {
+        "en": "Missing x-frame-options",
         "ru": "Отсутствует заголовок X-Frame-Options",
     },
-    "Missing x-content-type-options": {
-        "es": "Falta la cabecera X-Content-Type-Options",
+    "Falta la cabecera X-Content-Type-Options": {
+        "en": "Missing x-content-type-options",
         "ru": "Отсутствует заголовок X-Content-Type-Options",
     },
-    "Missing referrer-policy": {
-        "es": "Falta la cabecera Referrer-Policy",
+    "Falta la cabecera Referrer-Policy": {
+        "en": "Missing referrer-policy",
         "ru": "Отсутствует заголовок Referrer-Policy",
     },
-    "Missing permissions-policy": {
-        "es": "Falta la cabecera Permissions-Policy",
+    "Falta la cabecera Permissions-Policy": {
+        "en": "Missing permissions-policy",
         "ru": "Отсутствует заголовок Permissions-Policy",
     },
-    "SPF uses soft-fail (~all)": {
-        "es": "SPF usa soft-fail (~all)",
+    "SPF usa soft-fail (~all)": {
+        "en": "SPF uses soft-fail (~all)",
         "ru": "SPF использует soft-fail (~all)",
     },
-    "SPF policy is neutral": {
-        "es": "La política SPF es neutral",
+    "La política SPF es neutral": {
+        "en": "SPF policy is neutral",
         "ru": "Политика SPF нейтральная",
     },
-    "SPF policy is permissive": {
-        "es": "La política SPF es permisiva",
+    "La política SPF es permisiva": {
+        "en": "SPF policy is permissive",
         "ru": "Политика SPF разрешающая",
     },
-    "No SPF record": {
-        "es": "No hay registro SPF",
+    "No hay registro SPF": {
+        "en": "No SPF record",
         "ru": "Отсутствует запись SPF",
     },
-    "No DMARC record": {
-        "es": "No hay registro DMARC",
+    "No hay registro DMARC": {
+        "en": "No DMARC record",
         "ru": "Отсутствует запись DMARC",
     },
-    "No DKIM selector found among common selectors": {
-        "es": "No se encontró selector DKIM",
+    "No se encontró selector DKIM": {
+        "en": "No DKIM selector found among common selectors",
         "ru": "Селектор DKIM среди стандартных вариантов не найден",
     },
-    "DMARC policy is p=none (monitor only)": {
-        "es": "La política DMARC es p=none (sólo monitorización)",
+    "La política DMARC es p=none (solo monitorización)": {
+        "en": "DMARC policy is p=none (monitor only)",
         "ru": "Политика DMARC: p=none (только мониторинг)",
     },
-    "DMARC policy is p=quarantine": {
-        "es": "La política DMARC es p=quarantine",
+    "La política DMARC es p=quarantine": {
+        "en": "DMARC policy is p=quarantine",
         "ru": "Политика DMARC: p=quarantine",
     },
-    "Server banner exposed": {
-        "es": "Banner del servidor expuesto",
+    "Banner del servidor expuesto": {
+        "en": "Server banner exposed",
         "ru": "Раскрыт баннер сервера",
     },
-    "subdomains exposed": {
-        "es": "subdominios expuestos",
+    "subdominios expuestos": {
+        "en": "subdomains exposed",
         "ru": "раскрытых поддоменов",
     },
-    "subdomains exposed (large attack surface)": {
-        "es": "subdominios expuestos (superficie de ataque amplia)",
+    "subdominios expuestos (superficie de ataque amplia)": {
+        "en": "subdomains exposed (large attack surface)",
         "ru": "раскрытых поддоменов (большая поверхность атаки)",
     },
-    "High-risk port open: {port}/{name}": {
-        "es": "Puerto de alto riesgo abierto: {port}/{name}",
+    "Puerto de alto riesgo abierto: {port}/{name}": {
+        "en": "High-risk port open: {port}/{name}",
         "ru": "Открыт порт высокого риска: {port}/{name}",
     },
-    "{count} non-web ports open": {
-        "es": "{count} puertos no web abiertos",
+    "{count} puertos no web abiertos": {
+        "en": "{count} non-web ports open",
         "ru": "Открыто портов не для веб-служб: {count}",
     },
-    "Domain expires in {days} days": {
-        "es": "El dominio expira en {days} días",
+    "El dominio expira en {days} días": {
+        "en": "Domain expires in {days} days",
         "ru": "Срок регистрации домена истекает через {days} дн.",
     },
-    "Domain is only {days} days old": {
-        "es": "El dominio tiene solo {days} días de antigüedad",
+    "El dominio tiene solo {days} días de antigüedad": {
+        "en": "Domain is only {days} days old",
         "ru": "Возраст домена составляет всего {days} дн.",
     },
-    "Registrant contact data exposed (no WHOIS privacy)": {
-        "es": "Datos de contacto del registrante expuestos",
+    "Datos de contacto del registrante expuestos (sin WHOIS privado)": {
+        "en": "Registrant contact data exposed (no WHOIS privacy)",
         "ru": "Контактные данные владельца домена раскрыты",
     },
-    "Risk score increased from {previous} to {current} (+{delta})": {
-        "es": "El score de riesgo aumentó de {previous} a {current} (+{delta})",
+    "El score de riesgo aumentó de {previous} a {current} (+{delta})": {
+        "en": "Risk score increased from {previous} to {current} (+{delta})",
         "ru": "Оценка риска выросла с {previous} до {current} (+{delta})",
     },
-    "New high-risk port detected: {port}": {
-        "es": "Nuevo puerto de alto riesgo detectado: {port}",
+    "Nuevo puerto de alto riesgo detectado: {port}": {
+        "en": "New high-risk port detected: {port}",
         "ru": "Обнаружен новый порт высокого риска: {port}",
     },
-    "New open port detected: {port}": {
-        "es": "Nuevo puerto abierto detectado: {port}",
+    "Nuevo puerto abierto detectado: {port}": {
+        "en": "New open port detected: {port}",
         "ru": "Обнаружен новый открытый порт: {port}",
     },
-    "DMARC policy weakened or removed": {
-        "es": "La política DMARC se debilitó o fue eliminada",
+    "La política DMARC se debilitó o fue eliminada": {
+        "en": "DMARC policy weakened or removed",
         "ru": "Политика DMARC ослаблена или удалена",
     },
-    "SPF record removed": {
-        "es": "El registro SPF fue eliminado",
+    "El registro SPF fue eliminado": {
+        "en": "SPF record removed",
         "ru": "Запись SPF удалена",
     },
-    "Subdomain count increased from {previous} to {current}": {
-        "es": "La cantidad de subdominios aumentó de {previous} a {current}",
+    "La cantidad de subdominios aumentó de {previous} a {current}": {
+        "en": "Subdomain count increased from {previous} to {current}",
         "ru": "Количество поддоменов увеличилось с {previous} до {current}",
     },
 }
 
 
 def translate_finding_message(message: str, lang: str) -> str:
-    if lang == "en":
+    if lang == "es":
         return message
-    if message.startswith("Server banner exposed:"):
-        translated = FINDING_TRANSLATIONS["Server banner exposed"].get(lang)
+    if message.startswith("Banner del servidor expuesto:"):
+        translated = FINDING_TRANSLATIONS["Banner del servidor expuesto"].get(lang)
         if translated:
             return f"{translated}: {message.split(':', 1)[1].strip()}"
-    if message.endswith(" subdomains exposed") or message.endswith(" subdomains exposed (large attack surface)"):
-        key = "subdomains exposed (large attack surface)" if message.endswith("(large attack surface)") else "subdomains exposed"
+    if message.endswith(" subdominios expuestos") or message.endswith(" subdominios expuestos (superficie de ataque amplia)"):
+        key = "subdominios expuestos (superficie de ataque amplia)" if message.endswith("(superficie de ataque amplia)") else "subdominios expuestos"
         translated = FINDING_TRANSLATIONS[key].get(lang)
         if translated:
             count = message.split(" ", 1)[0]
             return f"{count} {translated}"
     dynamic_messages = (
-        (r"Risk score increased from (\d+) to (\d+) \(\+(\d+)\)", "Risk score increased from {previous} to {current} (+{delta})", ("previous", "current", "delta")),
-        (r"New high-risk port detected: (\d+)", "New high-risk port detected: {port}", ("port",)),
-        (r"New open port detected: (\d+)", "New open port detected: {port}", ("port",)),
-        (r"Subdomain count increased from (\d+) to (\d+)", "Subdomain count increased from {previous} to {current}", ("previous", "current")),
-        (r"High-risk port open: (\d+)/([A-Za-z0-9_-]+)", "High-risk port open: {port}/{name}", ("port", "name")),
-        (r"(\d+) non-web ports open", "{count} non-web ports open", ("count",)),
-        (r"Domain expires in (-?\d+) days", "Domain expires in {days} days", ("days",)),
-        (r"Domain is only (\d+) days old", "Domain is only {days} days old", ("days",)),
+        (r"El score de riesgo aumentó de (\d+) a (\d+) \(\+(\d+)\)", "El score de riesgo aumentó de {previous} a {current} (+{delta})", ("previous", "current", "delta")),
+        (r"Nuevo puerto de alto riesgo detectado: (\d+)", "Nuevo puerto de alto riesgo detectado: {port}", ("port",)),
+        (r"Nuevo puerto abierto detectado: (\d+)", "Nuevo puerto abierto detectado: {port}", ("port",)),
+        (r"La cantidad de subdominios aumentó de (\d+) a (\d+)", "La cantidad de subdominios aumentó de {previous} a {current}", ("previous", "current")),
+        (r"Puerto de alto riesgo abierto: (\d+)/([A-Za-z0-9_-]+)", "Puerto de alto riesgo abierto: {port}/{name}", ("port", "name")),
+        (r"(\d+) puertos no web abiertos", "{count} puertos no web abiertos", ("count",)),
+        (r"El dominio expira en (-?\d+) días", "El dominio expira en {days} días", ("days",)),
+        (r"El dominio tiene solo (\d+) días de antigüedad", "El dominio tiene solo {days} días de antigüedad", ("days",)),
     )
     for pattern, key, names in dynamic_messages:
         match = re.fullmatch(pattern, message)
