@@ -89,6 +89,15 @@ def scan_status(scan_id: int):
     return jsonify(get_status(scan))
 
 
+@dashboard_bp.delete("/targets/<int:target_id>")
+@login_required
+def delete_target(target_id: int):
+    target = Target.query.filter_by(id=target_id, user_id=current_user.id).first_or_404()
+    db.session.delete(target)
+    db.session.commit()
+    return "", 204
+
+
 @dashboard_bp.post("/targets/<int:target_id>/rescan")
 @login_required
 def rescan_target(target_id: int):

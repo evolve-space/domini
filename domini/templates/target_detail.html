@@ -16,6 +16,7 @@
     <div class="detail-actions">
         <button class="secondary-button" id="rescan-button" data-target-id="{{ target.id }}" type="button" data-i18n="rescan">{{ g.t.rescan }}</button>
         <a class="primary-button" href="{{ url_for('dashboard.export_target', target_id=target.id) }}" data-i18n="export_html">{{ g.t.export_html }}</a>
+        <button class="danger-button" id="delete-target-btn" type="button" data-target-id="{{ target.id }}">Eliminar target</button>
     </div>
 </section>
 
@@ -296,6 +297,34 @@
     </details>
 </section>
 {% endif %}
+<dialog id="delete-modal" class="confirm-dialog">
+    <form method="dialog">
+        <p class="modal-title">¿Eliminar target?</p>
+        <p class="modal-body">Se eliminarán todos los escaneos y alertas de <strong>{{ target.name }}</strong>. Esta acción no se puede deshacer.</p>
+        <div class="modal-actions">
+            <button class="secondary-button" value="cancel" type="submit">Cancelar</button>
+            <button class="danger-button" value="confirm" type="submit">Eliminar</button>
+        </div>
+    </form>
+</dialog>
+<script>
+(function () {
+    const deleteBtn = document.getElementById("delete-target-btn");
+    const modal = document.getElementById("delete-modal");
+    if (deleteBtn && modal) {
+        deleteBtn.addEventListener("click", function () { modal.showModal(); });
+        modal.addEventListener("close", async function () {
+            if (modal.returnValue !== "confirm") return;
+            try {
+                const resp = await fetch("/targets/" + deleteBtn.dataset.targetId, { method: "DELETE" });
+                if (resp.ok) window.location.href = "/dashboard";
+            } catch (err) {
+                console.error(err);
+            }
+        });
+    }
+}());
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const riskCanvas = document.getElementById("risk-chart");

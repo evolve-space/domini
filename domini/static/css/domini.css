@@ -310,6 +310,61 @@ a {
     color: #ffffff;
 }
 
+.danger-button {
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 14px;
+    border: 1px solid rgba(255, 107, 122, 0.4);
+    border-radius: 8px;
+    color: var(--danger);
+    background: rgba(255, 107, 122, 0.08);
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+.danger-button:hover {
+    border-color: var(--danger);
+    background: rgba(255, 107, 122, 0.18);
+    color: #ffffff;
+}
+
+.confirm-dialog {
+    padding: 28px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface-2);
+    color: var(--text);
+    max-width: 420px;
+    width: 90%;
+}
+.confirm-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+}
+.modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 10px;
+}
+.modal-body {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.65;
+    margin: 0 0 24px;
+}
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+.row-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
 .hero-button {
     min-width: 172px;
 }
