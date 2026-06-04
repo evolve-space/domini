@@ -387,13 +387,20 @@ def scan_payload(scan: Scan) -> dict[str, Any]:
 
 def finding_severity(phase: str, reason: str) -> str:
     normalized = reason.lower()
+    # HIGH
     if "puerto de alto riesgo" in normalized:
         return "high"
-    if normalized in {"falta la cabecera strict-transport-security", "falta la cabecera content-security-policy"}:
+    if normalized in {
+        "falta la cabecera strict-transport-security",
+        "falta la cabecera content-security-policy",
+        "no hay registro spf",
+        "no hay registro dmarc",
+    }:
         return "high"
     expiration = re.search(r"expira en (-?\d+) d", normalized)
     if expiration and int(expiration.group(1)) < 30:
         return "high"
+    # MEDIUM
     if "dmarc" in normalized and "p=none" in normalized:
         return "medium"
     if "spf" in normalized:
@@ -405,6 +412,7 @@ def finding_severity(phase: str, reason: str) -> str:
     subdomains = re.search(r"(\d+) subdominios expuestos", normalized)
     if subdomains and int(subdomains.group(1)) > 20:
         return "medium"
+    # LOW
     return "low"
 
 
