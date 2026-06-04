@@ -16,3 +16,8 @@ certs/
 *.db-journal
 CLAUDE.md
 .claude/
+*.env
+*.db
+*.key
+*.crt
+scan_reports/

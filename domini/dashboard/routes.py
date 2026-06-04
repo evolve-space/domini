@@ -144,7 +144,10 @@ def embedded_report(scan_id: int):
     allowed_root = Path(current_app.config["SCAN_OUTPUT_DIR"]).resolve()
     if allowed_root not in report_path.parents:
         abort(403)
-    return Response(report_path.read_text(encoding="utf-8"), mimetype="text/html")
+    response = Response(report_path.read_text(encoding="utf-8"), mimetype="text/html")
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers.pop("Content-Security-Policy", None)
+    return response
 
 
 @dashboard_bp.get("/targets/<int:target_id>/export.html")

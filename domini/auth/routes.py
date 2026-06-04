@@ -83,7 +83,7 @@ def login():
             user.reset_failed_attempts()
             db.session.commit()
             LOGIN_ATTEMPTS.pop(remote_ip(), None)
-            login_user(user)
+            login_user(user, remember=False)
             return redirect(url_for("dashboard.index"))
         if user:
             user.register_failed_attempt()
@@ -97,6 +97,7 @@ def login():
 @auth_bp.route("/logout")
 @login_required
 def logout():
+    session.clear()
     logout_user()
     return redirect(url_for("auth.login"))
 

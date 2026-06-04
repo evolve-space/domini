@@ -19,6 +19,7 @@ def main() -> int:
     parser.add_argument("output_dir")
     parser.add_argument("--sentinel-dir", required=True)
     parser.add_argument("--timeout", type=int, default=20)
+    parser.add_argument("--scanner", choices=["nmap", "masscan", "auto"], default="auto")
     args = parser.parse_args()
 
     sys.path.insert(0, args.sentinel_dir)
@@ -38,7 +39,7 @@ def main() -> int:
         "threat": ThreatModule(timeout=args.timeout).run,
         "cloud": CloudModule(timeout=args.timeout).run,
         "tor": TorModule(timeout=args.timeout).run,
-        "ports": PortsModule(timeout=args.timeout).run,
+        "ports": PortsModule(timeout=args.timeout, scanner=args.scanner).run,
     }
     results: dict[str, Any] = {}
     errors: dict[str, str] = {}
