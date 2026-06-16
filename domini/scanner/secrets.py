@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -54,13 +55,14 @@ def scan(domain: str) -> dict[str, Any]:
 
 def github_search(query: str, errors: list[str]) -> dict[str, Any]:
     params = urlencode({"q": query, "per_page": 10})
-    request = Request(
-        f"https://api.github.com/search/code?{params}",
-        headers={
-            "Accept": "application/vnd.github.text-match+json",
-            "User-Agent": "DOMINI-Secrets/0.1",
-        },
-    )
+    headers = {
+        "Accept": "application/vnd.github.text-match+json",
+        "User-Agent": "DOMINI-Secrets/0.1",
+    }
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = Request(f"https://api.github.com/search/code?{params}", headers=headers)
     try:
         with urlopen(request, timeout=TIMEOUT) as response:
             return json.loads(response.read().decode("utf-8", errors="replace"))
