@@ -1049,34 +1049,34 @@ tr:last-child td {
     }
 }
 
-.alerts-table {
-    min-width: 0;
-    width: 100%;
-}
-
-.alerts-table th:nth-child(1),
-.alerts-table td:nth-child(1) {
-    width: 28%;
-}
-
-.alerts-table th:nth-child(2),
-.alerts-table td:nth-child(2) {
-    width: 22%;
-    white-space: nowrap;
-}
-
 .alerts-table td:nth-child(3) {
     white-space: normal;
     word-break: break-word;
 }
 
 @media (max-width: 640px) {
+    .alerts-table {
+        min-width: 0;
+        width: 100%;
+        table-layout: fixed;
+    }
+
+    .alerts-table th:nth-child(1),
+    .alerts-table td:nth-child(1) {
+        width: 30%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .alerts-table th:nth-child(2),
+    .alerts-table td:nth-child(2) {
+        width: 20%;
+        white-space: nowrap;
+    }
+
     .alerts-table th:nth-child(4),
     .alerts-table td:nth-child(4) {
         display: none;
-    }
-
-    .alerts-table th {
-        white-space: normal;
     }
 }
