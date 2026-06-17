@@ -1056,14 +1056,12 @@ tr:last-child td {
 
 .alerts-table th:nth-child(1),
 .alerts-table td:nth-child(1) {
-    width: 130px;
-    min-width: 130px;
+    width: 28%;
 }
 
 .alerts-table th:nth-child(2),
 .alerts-table td:nth-child(2) {
-    width: 90px;
-    min-width: 90px;
+    width: 22%;
     white-space: nowrap;
 }
 
