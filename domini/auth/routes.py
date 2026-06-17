@@ -84,6 +84,7 @@ def login():
             db.session.commit()
             LOGIN_ATTEMPTS.pop(remote_ip(), None)
             login_user(user, remember=False)
+            session["_login_at"] = utcnow().isoformat()
             return redirect(url_for("dashboard.index"))
         if user:
             user.register_failed_attempt()
@@ -134,7 +135,8 @@ def register():
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
-            login_user(user)
+            login_user(user, remember=False)
+            session["_login_at"] = utcnow().isoformat()
             return redirect(url_for("dashboard.index"))
 
     return render_template("login.html", register_mode=True)

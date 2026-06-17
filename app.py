@@ -1,9 +1,10 @@
 import os
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from secrets import randbits
 
 from OpenSSL import crypto
-from flask import Flask, g, jsonify, request, session
+from flask import Flask, g, jsonify, redirect, request, session, url_for
 
 from config import Config, TRANSLATIONS
 from domini.extensions import bcrypt, db, login_manager
@@ -109,6 +110,24 @@ def create_app() -> Flask:
     @login_manager.user_loader
     def load_user(user_id: str) -> User | None:
         return db.session.get(User, int(user_id))
+
+    _SESSION_MAX_AGE = timedelta(hours=8)
+
+    @app.before_request
+    def enforce_session_age() -> None:
+        from flask_login import current_user, logout_user
+        login_at_str = session.get("_login_at")
+        if login_at_str and current_user.is_authenticated:
+            try:
+                login_at = datetime.fromisoformat(login_at_str)
+                if datetime.now(timezone.utc) - login_at > _SESSION_MAX_AGE:
+                    session.clear()
+                    logout_user()
+                    return redirect(url_for("auth.login"))
+            except (ValueError, TypeError):
+                session.clear()
+                logout_user()
+                return redirect(url_for("auth.login"))
 
     @app.before_request
     def set_locale() -> None:
