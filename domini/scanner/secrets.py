@@ -23,6 +23,7 @@ _IGNORE_PATH_TOKENS = frozenset([
     "bugbountydata",
     "respostes", "resultats", "apunts", "dam-digitech", "dades_alumnes", "fitxers",
     "plausible", "plausible-stats", "0483-form", "0484-", "0000-tutoria",
+    "python.org", "sources.json",
 ])
 
 # Filename pattern: student export files with domain encoded as _domain_tld_.json
