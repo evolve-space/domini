@@ -33,6 +33,8 @@ _IGNORE_PATH_TOKENS = frozenset([
     "bypass-captcha", "captcha", "structured-data", "design-notes",
     "humblebundle", "immersive-web", "weekly",
     "cobalt",
+    "edefuzz", "fakedns", "efps", "sarasa-gothic", "acs-aem-commons",
+    "linusjf",
     # Data / collection files (not config)
     "links.json", "apps.json", "content.json", "extras.json", "collection",
     "color.org",
@@ -47,7 +49,7 @@ _IGNORE_EXTENSIONS = frozenset([
 # Exact basename match (catches dependency / template env files)
 _IGNORE_FILENAMES = frozenset([
     "composer.json", "package.json", "package-lock.json",
-    "template.env", "params.env",
+    "template.env", "params.env", "config.env",
     ".env.example", ".env.sample", ".env.template", ".env.dist",
 ])
 
