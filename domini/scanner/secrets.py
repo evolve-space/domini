@@ -39,8 +39,7 @@ _IGNORE_PATH_TOKENS = frozenset([
     "sel_remove_bg",
     "kotaemon", "samuellau0802", "codename-co",
     "streetview-dl", "stiles",
-    "a2b-brand", "a2b-agency", "davidbenge",
-    "agentic-ai", "cladius",
+    "a2b-brand",
     # Data / collection files (not config)
     "links.json", "apps.json", "content.json", "extras.json", "collection",
     "color.org",
@@ -60,7 +59,7 @@ _IGNORE_FILENAMES = frozenset([
 ])
 
 # Substrings in filename (lowercased) that indicate a template/example file
-_IGNORE_NAME_SUBSTRINGS = ("template", "example", "sample", "_dot.")
+_IGNORE_NAME_SUBSTRINGS = ("template", "example", "sample")
 
 # Substring match for malware-scanner IP-based config dumps
 _IGNORE_PATH_SUBSTRINGS = ("config/3.", "config/4.")
