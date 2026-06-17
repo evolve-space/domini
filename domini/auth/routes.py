@@ -84,6 +84,7 @@ def login():
             db.session.commit()
             LOGIN_ATTEMPTS.pop(remote_ip(), None)
             login_user(user, remember=False)
+            session.permanent = True
             session["_login_at"] = utcnow().isoformat()
             return redirect(url_for("dashboard.index"))
         if user:
@@ -136,6 +137,7 @@ def register():
             db.session.add(user)
             db.session.commit()
             login_user(user, remember=False)
+            session.permanent = True
             session["_login_at"] = utcnow().isoformat()
             return redirect(url_for("dashboard.index"))
 
