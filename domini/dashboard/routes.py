@@ -3,6 +3,7 @@ from pathlib import Path
 
 from flask import Blueprint, Response, abort, current_app, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from domini.extensions import db
 from domini.models.scan import Alert, Scan, Target
@@ -22,6 +23,25 @@ from domini.scans.service import (
 )
 
 dashboard_bp = Blueprint("dashboard", __name__)
+
+_REPORT_TOKEN_SALT = "report-token-v1"
+_REPORT_TOKEN_TTL = 3600  # 1 hour
+
+
+def _make_report_token(scan_id: int, user_id: int) -> str:
+    s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt=_REPORT_TOKEN_SALT)
+    return s.dumps({"s": scan_id, "u": user_id})
+
+
+def _verify_report_token(token: str, scan_id: int) -> int | None:
+    s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt=_REPORT_TOKEN_SALT)
+    try:
+        data = s.loads(token, max_age=_REPORT_TOKEN_TTL)
+    except (BadSignature, SignatureExpired):
+        return None
+    if data.get("s") != scan_id:
+        return None
+    return data.get("u")
 
 
 @dashboard_bp.route("/")
@@ -121,6 +141,7 @@ def target_detail(target_id: int):
     payload = scan_payload(scan) if scan else {}
     findings = localize_findings(collect_findings(payload), g.lang)
     report_available = bool(first_report_path(payload))
+    report_token = _make_report_token(scan.id, current_user.id) if scan and report_available else None
     return render_template(
         "target_detail.html",
         target=target,
@@ -136,6 +157,7 @@ def target_detail(target_id: int):
         exposed_secret_findings=exposed_secret_findings(payload),
         supply_chain_findings=supply_chain_findings(payload),
         report_available=report_available,
+        report_token=report_token,
         report_title=report_title(payload),
         raw_json=json.dumps(payload, indent=2, ensure_ascii=False),
     )
@@ -145,6 +167,27 @@ def target_detail(target_id: int):
 @login_required
 def embedded_report(scan_id: int):
     scan = Scan.query.join(Target).filter(Scan.id == scan_id, Target.user_id == current_user.id).first_or_404()
+    payload = scan_payload(scan)
+    path = first_report_path(payload)
+    if not path:
+        return Response(f"<pre>{json.dumps(payload, indent=2, ensure_ascii=False)}</pre>", mimetype="text/html")
+    report_path = Path(path).resolve()
+    allowed_root = Path(current_app.config["SCAN_OUTPUT_DIR"]).resolve()
+    if allowed_root not in report_path.parents:
+        abort(403)
+    response = Response(report_path.read_text(encoding="utf-8"), mimetype="text/html")
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers.pop("Content-Security-Policy", None)
+    return response
+
+
+@dashboard_bp.get("/scans/<int:scan_id>/report/token")
+def embedded_report_token(scan_id: int):
+    token = request.args.get("token", "")
+    user_id = _verify_report_token(token, scan_id)
+    if user_id is None:
+        abort(403)
+    scan = Scan.query.join(Target).filter(Scan.id == scan_id, Target.user_id == user_id).first_or_404()
     payload = scan_payload(scan)
     path = first_report_path(payload)
     if not path:

@@ -97,7 +97,7 @@
         </div>
     </div>
     {% if scan and report_available %}
-        <iframe class="report-frame" src="{{ url_for('dashboard.embedded_report', scan_id=scan.id) }}" title="{{ g.t.embedded_report }}"></iframe>
+        <iframe class="report-frame" src="{{ url_for('dashboard.embedded_report_token', scan_id=scan.id, token=report_token) }}" title="{{ g.t.embedded_report }}"></iframe>
     {% else %}
         <pre class="raw-json">{{ raw_json }}</pre>
     {% endif %}
