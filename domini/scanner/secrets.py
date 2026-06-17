@@ -17,7 +17,7 @@ SECRET_KEYWORDS = {
     "token": "token",
 }
 
-# Substring match against (path + "/" + name)
+# Substring match against (html_url + "|" + path + "/" + name)
 _IGNORE_PATH_TOKENS = frozenset([
     # Generic noise
     "test", "spec", "mock", "fixture", "example", "sample", "demo", "tutorial",
@@ -28,13 +28,19 @@ _IGNORE_PATH_TOKENS = frozenset([
     "respostes", "resultats", "apunts", "dam-digitech", "dades_alumnes", "fitxers",
     "plausible", "plausible-stats", "0483-form", "0484-", "0000-tutoria",
     "python.org", "sources.json",
-    # Known noisy repos / paths
+    # Known noisy repos / users
     "bugbountydata", "bugbounty/data",
     "bypass-captcha", "captcha", "structured-data", "design-notes",
     "humblebundle", "immersive-web", "weekly",
     "cobalt",
     "edefuzz", "fakedns", "efps", "sarasa-gothic", "acs-aem-commons",
     "linusjf",
+    "plex-stuff", "bullmoose",
+    "sel_remove_bg",
+    "kotaemon", "samuellau0802", "codename-co",
+    "streetview-dl", "stiles",
+    "a2b-brand", "a2b-agency", "davidbenge",
+    "agentic-ai", "cladius",
     # Data / collection files (not config)
     "links.json", "apps.json", "content.json", "extras.json", "collection",
     "color.org",
@@ -46,22 +52,35 @@ _IGNORE_EXTENSIONS = frozenset([
     ".po", ".org", ".lock",
 ])
 
-# Exact basename match (catches dependency / template env files)
+# Exact basename match (dependency manifests, env templates)
 _IGNORE_FILENAMES = frozenset([
     "composer.json", "package.json", "package-lock.json",
     "template.env", "params.env", "config.env",
     ".env.example", ".env.sample", ".env.template", ".env.dist",
 ])
 
-# Substring match for malware-scanner config dumps (IP-based filenames)
+# Substrings in filename (lowercased) that indicate a template/example file
+_IGNORE_NAME_SUBSTRINGS = ("template", "example", "sample", "_dot.")
+
+# Substring match for malware-scanner IP-based config dumps
 _IGNORE_PATH_SUBSTRINGS = ("config/3.", "config/4.")
 
 # Student export files: {name}_{domain}_{tld}_.json
 _STUDENT_DOMAIN_FILE_RE = re.compile(r'_[a-z0-9][\w\-]*_[a-z]{2,6}_\.json$', re.IGNORECASE)
 
+# Fragment content that marks a file as a template/example, not live credentials
+_TEMPLATE_FRAGMENT_RE = re.compile(
+    r'copy\s+this\s+file\s+to\s+\.env'
+    r'|replace.*fake.*credential'
+    r'|this\s+is\s+an?\s+example'
+    r'|example\s+\.env'
+    r'|fill\s+in\s+your',
+    re.IGNORECASE,
+)
+
 # Placeholder / fake-value patterns in fragments
 _PLACEHOLDER_RE = re.compile(
-    r'your[_\-]?(?:token|password|key|secret|api)'
+    r'your[_\-]?(?:token|password|key|secret|api|namespace)'
     r'|your[\-_]'
     r'|my[\-_](?:token|password|key|secret|api)'
     r'|insert[\-_]'
@@ -76,7 +95,8 @@ _PLACEHOLDER_RE = re.compile(
     r'|\bexample\b'
     r'|\bchangeme\b'
     r'|\bplaceholder\b'
-    r'|<[a-zA-Z_][^>]{0,30}>'
+    r'|\bdummy\b'
+    r'|<[a-zA-Z_][^>]{0,40}>'
     r'|insert[_\-]?here'
     r'|\$\{[^}]+\}'
     r'|\{\{[^}]+\}\}'
@@ -94,7 +114,7 @@ _REAL_CRED_RE = re.compile(
     r'|sk-[a-zA-Z0-9]{32,}'
     r'|AKIA[A-Z0-9]{16}'
     r'|AIza[0-9A-Za-z\-_]{35}'
-    r'|ey[A-Za-z0-9\-_]{20,}\.[A-Za-z0-9\-_]{20,}'
+    r'|ey[A-Za-z0-9\-_]{20,}\.[A-Za-z0-9\-_]{20,}(?!\S*FAKE)'
 )
 
 # KEY = VALUE extraction
@@ -103,19 +123,39 @@ _ENV_VALUE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Patterns that indicate a value is a variable reference or template, not a real credential
+# Variable references and template markers
 _VAR_REF_RE = re.compile(r'^\$|\$\{|\{\{|^[%#]', re.IGNORECASE)
 
-# Repeated single character: "aaaa", "xxxx", "0000", "1111"
+# Repeated single character: "aaaa", "xxxx", "0000"
 _REPEATED_CHAR_RE = re.compile(r'^(.)\1{3,}$')
 
+# Bare URL without embedded credentials
 _URL_ONLY_RE = re.compile(r'^https?://', re.IGNORECASE)
 
+# Values that are clearly placeholder names regardless of length
 _FAKE_VALUES = frozenset([
     "null", "none", "true", "false", "undefined", "nil", "n/a",
     "your_token", "your_password", "your_key", "your_secret",
+    "your-key", "your-token", "your-secret",
+    "api_key", "secret_key", "openai_key",
     "insert_here", "changeme", "placeholder", "example", "xxxxxxxx",
+    "dummy", "fake", "test",
 ])
+
+# Strings within a value that make it clearly fake
+_FAKE_IN_VALUE_RE = re.compile(
+    r'\bfake\b'
+    r'|\bexample\b'
+    r'|\bdemo\b'
+    r'|\bdummy\b'
+    r'|\btest\b'
+    r'|\bsample\b'
+    r'|your[_\-]namespace',
+    re.IGNORECASE,
+)
+
+# Demo hex sequences commonly used as placeholder tokens
+_DEMO_HEX_RE = re.compile(r'^1234567890abcdef|^0{8,}|^f{8,}', re.IGNORECASE)
 
 
 def scan(domain: str) -> dict[str, Any]:
@@ -187,15 +227,29 @@ def _has_real_value(fragments: list[str]) -> bool:
         value = match.group(1).strip().strip('"\'')
         if not value:
             continue
+        # Variable reference or template syntax
         if _VAR_REF_RE.search(value):
             continue
+        # Starts with < and ends with > — placeholder like <YOUR_KEY>
+        if value.startswith("<") and value.endswith(">"):
+            continue
+        # Repeated single character
         if _REPEATED_CHAR_RE.match(value):
             continue
+        # Bare URL
         if _URL_ONLY_RE.match(value):
             continue
+        # Known fake exact values
         if value.lower() in _FAKE_VALUES:
             continue
+        # Placeholder patterns in value
         if _PLACEHOLDER_RE.search(value):
+            continue
+        # Fake/demo/test substring inside value
+        if _FAKE_IN_VALUE_RE.search(value):
+            continue
+        # Demo hex sequences
+        if _DEMO_HEX_RE.match(value):
             continue
         return True
     return False
@@ -210,19 +264,23 @@ def classify_secret(item: dict[str, Any]) -> str | None:
     if ext in _IGNORE_EXTENSIONS:
         return None
 
-    # Ignore specific filenames (dependency manifests, env templates)
+    # Ignore specific filenames
     if name in _IGNORE_FILENAMES:
         return None
+
+    # Ignore template/example/sample filenames by substring
+    for substr in _IGNORE_NAME_SUBSTRINGS:
+        if substr in name:
+            return None
 
     # Ignore student export files: *_domain_tld_.json
     if _STUDENT_DOMAIN_FILE_RE.search(name):
         return None
 
     html_url = (item.get("html_url") or "").lower()
-    # Include repo name from html_url so tokens match against repo/user names too
     combined_path = html_url + "|" + path + "/" + name
 
-    # Ignore by path / repo substring tokens
+    # Ignore by path / repo / user substring tokens
     for token in _IGNORE_PATH_TOKENS:
         if token in combined_path:
             return None
@@ -237,7 +295,11 @@ def classify_secret(item: dict[str, Any]) -> str | None:
     fragments = _fragments_from_item(item)
     all_text = "\n".join(fragments)
 
-    # Skip if fragments contain only placeholder patterns and no real credential token
+    # Skip files whose fragments identify them as templates or example files
+    if _TEMPLATE_FRAGMENT_RE.search(all_text):
+        return None
+
+    # Skip if fragments contain only placeholder patterns and no real credential
     if all_text and _PLACEHOLDER_RE.search(all_text) and not _REAL_CRED_RE.search(all_text):
         if not _has_real_value(fragments):
             return None
