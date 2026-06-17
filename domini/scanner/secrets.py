@@ -21,6 +21,7 @@ _IGNORE_PATH_TOKENS = frozenset([
     "test", "spec", "mock", "fixture", "example", "sample", "demo",
     "readme", "alumne", "student", "exam", "quiz", "cours",
     "bugbountydata",
+    "respostes", "resultats", "apunts", "dam-digitech", "dades_alumnes", "fitxers",
 ])
 _IGNORE_EXTENSIONS = frozenset([".md", ".rst", ".txt", ".bib", ".bbl"])
 
