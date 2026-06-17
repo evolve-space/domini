@@ -58,7 +58,7 @@
     <article class="score-panel">
         {% set score = scan.risk_score if scan and scan.risk_score is not none else 0 %}
         {% set offset = 314 - (314 * score / 100) %}
-        <div class="score-ring" style="--score-offset: {{ offset }};">
+        <div class="score-ring" data-score-offset="{{ offset }}">
             <svg viewBox="0 0 120 120" role="img" aria-label="{{ g.t.score }} {{ score }}">
                 <circle class="ring-bg" cx="60" cy="60" r="50"></circle>
                 <circle class="ring-fg" cx="60" cy="60" r="50"></circle>
@@ -307,68 +307,4 @@
         </div>
     </form>
 </dialog>
-<script>
-(function () {
-    const deleteBtn = document.getElementById("delete-target-btn");
-    const modal = document.getElementById("delete-modal");
-    if (deleteBtn && modal) {
-        deleteBtn.addEventListener("click", function () { modal.showModal(); });
-        modal.addEventListener("close", async function () {
-            if (modal.returnValue !== "confirm") return;
-            try {
-                const resp = await fetch("/targets/" + deleteBtn.dataset.targetId, { method: "DELETE" });
-                if (resp.ok) window.location.href = "/dashboard";
-            } catch (err) {
-                console.error(err);
-            }
-        });
-    }
-}());
-</script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    const riskCanvas = document.getElementById("risk-chart");
-    if (riskCanvas && window.Chart) {
-        const chartData = JSON.parse(riskCanvas.dataset.chart || '{"labels":[],"scores":[]}');
-        const context = riskCanvas.getContext("2d");
-        const gradient = context.createLinearGradient(0, 0, riskCanvas.clientWidth || 600, 0);
-        gradient.addColorStop(0, "#0066ff");
-        gradient.addColorStop(1, "#00d4ff");
-        new Chart(context, {
-            type: "line",
-            data: {
-                labels: chartData.labels,
-                datasets: [{
-                    data: chartData.scores,
-                    borderColor: gradient,
-                    backgroundColor: "rgba(0, 212, 255, 0.12)",
-                    pointBackgroundColor: "#00d4ff",
-                    pointBorderColor: "#edf4ff",
-                    pointRadius: 4,
-                    tension: 0.32,
-                    fill: true,
-                }],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                },
-                scales: {
-                    x: {
-                        ticks: { color: "#8b98a9" },
-                        grid: { color: "rgba(148, 163, 184, 0.12)" },
-                    },
-                    y: {
-                        min: 0,
-                        max: 100,
-                        ticks: { color: "#8b98a9" },
-                        grid: { color: "rgba(148, 163, 184, 0.12)" },
-                    },
-                },
-            },
-        });
-    }
-</script>
 {% endblock %}

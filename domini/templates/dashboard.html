@@ -111,35 +111,4 @@
         </div>
     </form>
 </dialog>
-<script>
-(function () {
-    const modal = document.getElementById("delete-modal");
-    const modalName = document.getElementById("delete-target-name");
-    let pendingId = null;
-    let pendingRow = null;
-
-    document.querySelectorAll(".delete-target-btn").forEach(function (btn) {
-        btn.addEventListener("click", function (e) {
-            e.stopPropagation();
-            pendingId = btn.dataset.targetId;
-            pendingRow = btn.closest("tr");
-            modalName.textContent = btn.dataset.targetName;
-            modal.showModal();
-        });
-    });
-
-    modal.addEventListener("close", async function () {
-        if (modal.returnValue !== "confirm" || !pendingId) return;
-        try {
-            const resp = await fetch("/targets/" + pendingId, { method: "DELETE" });
-            if (resp.ok && pendingRow) pendingRow.remove();
-        } catch (err) {
-            console.error(err);
-        } finally {
-            pendingId = null;
-            pendingRow = null;
-        }
-    });
-}());
-</script>
 {% endblock %}

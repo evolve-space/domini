@@ -161,3 +161,105 @@ if (activeScanId) {
 }
 
 document.documentElement.dataset.ready = "true";
+
+// Password strength validator — login (register mode) and reset_password
+(function () {
+    const input = document.getElementById("password-input");
+    const hint = document.getElementById("password-hint");
+    if (!input || !hint) return;
+    input.addEventListener("input", () => {
+        const valid = input.value.length >= 8 && /[A-Za-z]/.test(input.value) && /\d/.test(input.value);
+        hint.classList.toggle("is-valid", valid);
+    });
+}());
+
+// Dashboard: delete modal (table with multiple targets)
+// Discriminator: only dashboard has #delete-target-name span
+(function () {
+    const modal = document.getElementById("delete-modal");
+    const modalName = document.getElementById("delete-target-name");
+    if (!modal || !modalName) return;
+    let pendingId = null;
+    let pendingRow = null;
+    document.querySelectorAll(".delete-target-btn").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            pendingId = btn.dataset.targetId;
+            pendingRow = btn.closest("tr");
+            modalName.textContent = btn.dataset.targetName;
+            modal.showModal();
+        });
+    });
+    modal.addEventListener("close", async function () {
+        if (modal.returnValue !== "confirm" || !pendingId) return;
+        try {
+            const resp = await fetch("/targets/" + pendingId, { method: "DELETE" });
+            if (resp.ok && pendingRow) pendingRow.remove();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            pendingId = null;
+            pendingRow = null;
+        }
+    });
+}());
+
+// Target detail: delete modal (single target)
+// Discriminator: only target_detail has #delete-target-btn
+(function () {
+    const btn = document.getElementById("delete-target-btn");
+    const modal = document.getElementById("delete-modal");
+    if (!btn || !modal) return;
+    btn.addEventListener("click", function () { modal.showModal(); });
+    modal.addEventListener("close", async function () {
+        if (modal.returnValue !== "confirm") return;
+        try {
+            const resp = await fetch("/targets/" + btn.dataset.targetId, { method: "DELETE" });
+            if (resp.ok) window.location.href = "/dashboard";
+        } catch (err) {
+            console.error(err);
+        }
+    });
+}());
+
+// Score ring: apply CSS custom property from data attribute
+(function () {
+    const ring = document.querySelector(".score-ring[data-score-offset]");
+    if (ring) ring.style.setProperty("--score-offset", ring.dataset.scoreOffset);
+}());
+
+// Chart.js risk evolution chart
+(function () {
+    const canvas = document.getElementById("risk-chart");
+    if (!canvas || !window.Chart) return;
+    const chartData = JSON.parse(canvas.dataset.chart || '{"labels":[],"scores":[]}');
+    const ctx = canvas.getContext("2d");
+    const gradient = ctx.createLinearGradient(0, 0, canvas.clientWidth || 600, 0);
+    gradient.addColorStop(0, "#0066ff");
+    gradient.addColorStop(1, "#00d4ff");
+    new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: chartData.labels,
+            datasets: [{
+                data: chartData.scores,
+                borderColor: gradient,
+                backgroundColor: "rgba(0, 212, 255, 0.12)",
+                pointBackgroundColor: "#00d4ff",
+                pointBorderColor: "#edf4ff",
+                pointRadius: 4,
+                tension: 0.32,
+                fill: true,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: "#8b98a9" }, grid: { color: "rgba(148, 163, 184, 0.12)" } },
+                y: { min: 0, max: 100, ticks: { color: "#8b98a9" }, grid: { color: "rgba(148, 163, 184, 0.12)" } },
+            },
+        },
+    });
+}());

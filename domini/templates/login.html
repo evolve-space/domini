@@ -57,14 +57,4 @@
         {% endif %}
     </nav>
 </section>
-{% if register_mode %}
-<script>
-    const passwordInput = document.getElementById("password-input");
-    const passwordHint = document.getElementById("password-hint");
-    passwordInput.addEventListener("input", () => {
-        const valid = passwordInput.value.length >= 8 && /[A-Za-z]/.test(passwordInput.value) && /\d/.test(passwordInput.value);
-        passwordHint.classList.toggle("is-valid", valid);
-    });
-</script>
-{% endif %}
 {% endblock %}
