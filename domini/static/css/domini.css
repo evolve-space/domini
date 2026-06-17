@@ -1051,17 +1051,34 @@ tr:last-child td {
 
 .alerts-table {
     min-width: 0;
+    width: 100%;
+}
+
+.alerts-table th:nth-child(1),
+.alerts-table td:nth-child(1) {
+    width: 130px;
+    min-width: 130px;
+}
+
+.alerts-table th:nth-child(2),
+.alerts-table td:nth-child(2) {
+    width: 90px;
+    min-width: 90px;
+    white-space: nowrap;
 }
 
 .alerts-table td:nth-child(3) {
     white-space: normal;
     word-break: break-word;
-    max-width: 240px;
 }
 
 @media (max-width: 640px) {
     .alerts-table th:nth-child(4),
     .alerts-table td:nth-child(4) {
         display: none;
+    }
+
+    .alerts-table th {
+        white-space: normal;
     }
 }
