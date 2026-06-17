@@ -22,7 +22,12 @@ _IGNORE_PATH_TOKENS = frozenset([
     "readme", "alumne", "student", "exam", "quiz", "cours",
     "bugbountydata",
     "respostes", "resultats", "apunts", "dam-digitech", "dades_alumnes", "fitxers",
+    "plausible", "plausible-stats", "0483-form", "0484-", "0000-tutoria",
 ])
+
+# Filename pattern: student export files with domain encoded as _domain_tld_.json
+# e.g. juanmagalan2007_digitechfp_com_.json
+_STUDENT_DOMAIN_FILE_RE = re.compile(r'_[a-z0-9][\w\-]*_[a-z]{2,6}_\.json$', re.IGNORECASE)
 _IGNORE_EXTENSIONS = frozenset([".md", ".rst", ".txt", ".bib", ".bbl"])
 
 _PLACEHOLDER_RE = re.compile(
@@ -142,6 +147,10 @@ def classify_secret(item: dict[str, Any]) -> str | None:
     # Rule 1: ignore by file extension
     _, ext = os.path.splitext(name)
     if ext in _IGNORE_EXTENSIONS:
+        return None
+
+    # Rule 1: ignore student export files: *_domain_tld_.json
+    if _STUDENT_DOMAIN_FILE_RE.search(name):
         return None
 
     # Rule 1: ignore test / doc / academic / bug-bounty-dump paths
