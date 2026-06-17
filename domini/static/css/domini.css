@@ -1048,3 +1048,20 @@ tr:last-child td {
         padding: 24px;
     }
 }
+
+.alerts-table {
+    min-width: 0;
+}
+
+.alerts-table td:nth-child(3) {
+    white-space: normal;
+    word-break: break-word;
+    max-width: 240px;
+}
+
+@media (max-width: 640px) {
+    .alerts-table th:nth-child(4),
+    .alerts-table td:nth-child(4) {
+        display: none;
+    }
+}
