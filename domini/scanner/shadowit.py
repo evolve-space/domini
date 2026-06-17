@@ -8,14 +8,14 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 SUSPICIOUS_PREFIXES = ("staging-", "dev-", "test-", "old-", "backup-", "admin-")
-TIMEOUT = 8
+TIMEOUT = 20
 
 
 def scan(domain: str) -> dict[str, Any]:
     findings: list[dict[str, str]] = []
     errors: list[str] = []
 
-    subdomains = fetch_crtsh_names(domain, errors)
+    subdomains = fetch_subdomains(domain, errors)
     for name in subdomains:
         if has_suspicious_pattern(name):
             findings.append({"type": "patrón sospechoso", "value": name, "risk": "medium"})
@@ -38,6 +38,13 @@ def scan(domain: str) -> dict[str, Any]:
     }
 
 
+def fetch_subdomains(domain: str, errors: list[str]) -> list[str]:
+    names = fetch_crtsh_names(domain, errors)
+    if not names:
+        names = fetch_hackertarget_names(domain, errors)
+    return names
+
+
 def fetch_crtsh_names(domain: str, errors: list[str]) -> list[str]:
     params = urlencode({"q": f"%.{domain}", "output": "json"})
     request = Request(
@@ -46,6 +53,9 @@ def fetch_crtsh_names(domain: str, errors: list[str]) -> list[str]:
     )
     try:
         with urlopen(request, timeout=TIMEOUT) as response:
+            if response.status != 200:
+                errors.append(f"crt.sh: HTTP {response.status}")
+                return []
             payload = json.loads(response.read().decode("utf-8", errors="replace"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
         errors.append(f"crt.sh: {type(exc).__name__}: {exc}")
@@ -57,6 +67,32 @@ def fetch_crtsh_names(domain: str, errors: list[str]) -> list[str]:
             name = normalize_hostname(raw, domain)
             if name:
                 names.add(name)
+    return sorted(names)
+
+
+def fetch_hackertarget_names(domain: str, errors: list[str]) -> list[str]:
+    # API pública de hackertarget — devuelve texto plano: "hostname,IP" por línea
+    request = Request(
+        f"https://api.hackertarget.com/hostsearch/?q={domain}",
+        headers={"User-Agent": "DOMINI-ShadowIT/0.1"},
+    )
+    try:
+        with urlopen(request, timeout=TIMEOUT) as response:
+            body = response.read().decode("utf-8", errors="replace")
+    except (HTTPError, URLError, TimeoutError) as exc:
+        errors.append(f"hackertarget: {type(exc).__name__}: {exc}")
+        return []
+
+    if body.startswith("error") or "API count" in body:
+        errors.append(f"hackertarget: {body.strip()[:120]}")
+        return []
+
+    names: set[str] = set()
+    for line in body.splitlines():
+        hostname = line.split(",")[0].strip()
+        name = normalize_hostname(hostname, domain)
+        if name:
+            names.add(name)
     return sorted(names)
 
 
