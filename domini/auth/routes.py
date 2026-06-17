@@ -71,14 +71,14 @@ def login():
         require_csrf()
         if len(current_ip_attempts()) >= Config.LOGIN_RATE_LIMIT_ATTEMPTS:
             flash(g.t["account_locked"].format(minutes=5), "error")
-            return render_template("login.html")
+            return render_template("login.html", register_enabled=bool(Config.INVITE_CODE))
 
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         user = User.query.filter_by(username=username).first()
         if user and user.is_locked():
             flash(g.t["account_locked"].format(minutes=locked_minutes(user)), "error")
-            return render_template("login.html")
+            return render_template("login.html", register_enabled=bool(Config.INVITE_CODE))
         if user and user.check_password(password):
             user.reset_failed_attempts()
             db.session.commit()
@@ -91,7 +91,7 @@ def login():
         current_ip_attempts().append(utcnow())
         flash("invalid_credentials", "error")
 
-    return render_template("login.html")
+    return render_template("login.html", register_enabled=bool(Config.INVITE_CODE))
 
 
 @auth_bp.route("/logout")
@@ -104,13 +104,20 @@ def logout():
 
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
+    invite_code_required = Config.INVITE_CODE
+    if not invite_code_required:
+        abort(404)
+
     if request.method == "POST":
         require_csrf()
         username = request.form.get("username", "").strip()
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         confirmation = request.form.get("password_confirm", "")
-        if not USERNAME_RE.fullmatch(username):
+        invite_code = request.form.get("invite_code", "").strip()
+        if not secrets.compare_digest(invite_code, invite_code_required):
+            flash("invalid_invite_code", "error")
+        elif not USERNAME_RE.fullmatch(username):
             flash("invalid_username_format", "error")
         elif not EMAIL_RE.fullmatch(email):
             flash("invalid_email_format", "error")

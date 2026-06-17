@@ -45,6 +45,10 @@
             <span data-i18n="confirm_password">{{ g.t.confirm_password }}</span>
             <input name="password_confirm" type="password" autocomplete="new-password" required placeholder="{{ g.t.confirm_password }}" data-i18n-placeholder="confirm_password">
         </label>
+        <label class="field">
+            <span data-i18n="invite_code">{{ g.t.invite_code }}</span>
+            <input name="invite_code" type="text" autocomplete="off" required placeholder="{{ g.t.invite_code_placeholder }}" data-i18n-placeholder="invite_code_placeholder">
+        </label>
         {% endif %}
         <button class="primary-button" type="submit" data-i18n="{{ 'create_account' if register_mode else 'login' }}">{{ g.t.create_account if register_mode else g.t.login }}</button>
     </form>
@@ -53,7 +57,9 @@
             <a href="{{ url_for('auth.login') }}" data-i18n="already_have_account">{{ g.t.already_have_account }}</a>
         {% else %}
             <a href="{{ url_for('auth.forgot_password') }}" data-i18n="forgot_password">{{ g.t.forgot_password }}</a>
+            {% if register_enabled %}
             <a href="{{ url_for('auth.register') }}" data-i18n="need_account">{{ g.t.need_account }}</a>
+            {% endif %}
         {% endif %}
     </nav>
 </section>

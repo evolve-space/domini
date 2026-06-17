@@ -202,6 +202,22 @@ def embedded_report_token(scan_id: int):
     return response
 
 
+@dashboard_bp.get("/alerts")
+@login_required
+def alerts():
+    alerts_list = (
+        Alert.query.join(Target)
+        .filter(Target.user_id == current_user.id)
+        .order_by(Alert.read.asc(), Alert.created_at.desc())
+        .all()
+    )
+    for alert in alerts_list:
+        if not alert.read:
+            alert.read = True
+    db.session.commit()
+    return render_template("alerts.html", alerts=alerts_list)
+
+
 @dashboard_bp.get("/targets/<int:target_id>/export.html")
 @login_required
 def export_target(target_id: int):

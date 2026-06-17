@@ -35,5 +35,7 @@ class Config:
     DOMINUS_PYTHON = os.getenv("DOMINUS_PYTHON", str(DOMINUS_DIR / ".venv" / "bin" / "python"))
     SENTINEL_PYTHON = os.getenv("SENTINEL_PYTHON", str(SENTINEL_DIR / ".venv" / "bin" / "python"))
     SCAN_OUTPUT_DIR = Path(os.getenv("SCAN_OUTPUT_DIR", str(BASE_DIR / "instance" / "scan_reports")))
+    SESSION_PERMANENT = False
+    INVITE_CODE = os.getenv("INVITE_CODE", "")
     LOGIN_RATE_LIMIT_ATTEMPTS = 10
     LOGIN_RATE_LIMIT_WINDOW_SECONDS = 300

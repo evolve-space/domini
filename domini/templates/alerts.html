@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="detail-header">
+    <div>
+        <a class="back-link" href="{{ url_for('dashboard.index') }}" data-i18n="back_dashboard">{{ g.t.back_dashboard }}</a>
+        <span class="eyebrow" data-i18n="active_alerts">{{ g.t.active_alerts }}</span>
+        <h1 data-i18n="alerts_all">{{ g.t.alerts_all }}</h1>
+    </div>
+    <span class="status-badge">{{ alerts|length }}</span>
+</section>
+
+<section class="data-panel">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th data-i18n="target">{{ g.t.target }}</th>
+                    <th data-i18n="severity">{{ g.t.severity }}</th>
+                    <th data-i18n="message">{{ g.t.message }}</th>
+                    <th data-i18n="date">{{ g.t.date }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alert in alerts %}
+                <tr>
+                    <td>
+                        <a class="target-link" href="{{ url_for('dashboard.target_detail', target_id=alert.target_id) }}">
+                            {{ alert.target.name }}
+                        </a>
+                    </td>
+                    <td><span class="severity severity-{{ alert.severity }}">{{ alert.severity }}</span></td>
+                    <td>{{ alert.message }}</td>
+                    <td class="mono">{{ alert.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                </tr>
+                {% else %}
+                <tr class="empty-row">
+                    <td colspan="4" data-i18n="no_alerts">{{ g.t.no_alerts }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

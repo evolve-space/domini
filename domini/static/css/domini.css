@@ -403,6 +403,18 @@ a {
     font-size: 13px;
 }
 
+a.metric-card-link {
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+a.metric-card-link:hover {
+    border-color: var(--accent, #3b82f6);
+    box-shadow: 0 0 0 1px var(--accent, #3b82f6);
+}
+
 .data-panel {
     margin-top: 18px;
     padding: 24px;

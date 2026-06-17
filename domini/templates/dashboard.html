@@ -32,11 +32,11 @@
         <strong class="metric-value mono">{{ completed_count }}</strong>
         <span class="metric-note" data-i18n="completed_metric_note">{{ g.t.completed_metric_note }}</span>
     </article>
-    <article class="metric-card">
+    <a class="metric-card metric-card-link" href="{{ url_for('dashboard.alerts') }}">
         <span class="metric-label" data-i18n="active_alerts">{{ g.t.active_alerts }}</span>
         <strong class="metric-value mono">{{ active_alerts }}</strong>
         <span class="metric-note" data-i18n="alerts_metric_note">{{ g.t.alerts_metric_note }}</span>
-    </article>
+    </a>
     <article class="metric-card">
         <span class="metric-label" data-i18n="average_score">{{ g.t.average_score }}</span>
         <strong class="metric-value mono">{{ average_score if average_score is not none else "--" }}</strong>
