@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import ssl
 from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urlparse
-import warnings
 
 import requests
-from urllib3.exceptions import InsecureRequestWarning
 
 TIMEOUT = 10
 
@@ -33,14 +32,15 @@ class DependencyParser(HTMLParser):
 def scan(domain: str) -> dict[str, Any]:
     """Detect third-party technologies and external dependencies for a domain."""
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", InsecureRequestWarning)
-            response = requests.get(f"https://{domain}", timeout=TIMEOUT, verify=False)
+        response = requests.get(f"https://{domain}", timeout=TIMEOUT)
         findings: list[dict[str, str]] = []
         findings.extend(header_findings(response.headers))
         findings.extend(body_findings(response.text, domain))
         unique = dedupe_findings(findings)
         return {"findings": unique, "count": len(unique), "error": None}
+    except (ssl.SSLError, requests.exceptions.SSLError) as exc:
+        ssl_finding = {"type": "tls", "provider": "SSL/TLS", "risk": "high"}
+        return {"findings": [ssl_finding], "count": 1, "error": str(exc)}
     except Exception as exc:  # noqa: BLE001
         return {"findings": [], "count": 0, "error": str(exc)}
 

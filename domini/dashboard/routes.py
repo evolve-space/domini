@@ -1,10 +1,10 @@
 import json
 import re
+import secrets
 from pathlib import Path
 
 from flask import Blueprint, Response, abort, current_app, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
-from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from domini.auth.routes import require_csrf
 from domini.extensions import db
@@ -25,25 +25,6 @@ from domini.scans.service import (
 )
 
 dashboard_bp = Blueprint("dashboard", __name__)
-
-_REPORT_TOKEN_SALT = "report-token-v1"
-_REPORT_TOKEN_TTL = 300  # 5 minutes
-
-
-def _make_report_token(scan_id: int, user_id: int) -> str:
-    s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt=_REPORT_TOKEN_SALT)
-    return s.dumps({"s": scan_id, "u": user_id})
-
-
-def _verify_report_token(token: str, scan_id: int) -> int | None:
-    s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt=_REPORT_TOKEN_SALT)
-    try:
-        data = s.loads(token, max_age=_REPORT_TOKEN_TTL)
-    except (BadSignature, SignatureExpired):
-        return None
-    if data.get("s") != scan_id:
-        return None
-    return data.get("u")
 
 
 @dashboard_bp.route("/")
@@ -96,6 +77,7 @@ def index():
 @dashboard_bp.post("/scans")
 @login_required
 def create_scan():
+    require_csrf()
     data = request.get_json(silent=True) or request.form
     target = (data.get("target") or "").strip()
     if not target:
@@ -165,6 +147,23 @@ def target_detail(target_id: int):
     )
 
 
+def _build_report_response(html: str) -> Response:
+    nonce = secrets.token_urlsafe(16)
+    html = html.replace("<script", f'<script nonce="{nonce}"')
+    html = html.replace("<style", f'<style nonce="{nonce}"')
+    response = Response(html, mimetype="text/html")
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Content-Security-Policy"] = (
+        f"default-src 'self'; "
+        f"script-src 'self' 'nonce-{nonce}'; "
+        f"style-src 'self' 'nonce-{nonce}' https://fonts.googleapis.com; "
+        f"font-src 'self' https://fonts.gstatic.com; "
+        f"object-src 'none'; "
+        f"base-uri 'none'"
+    )
+    return response
+
+
 @dashboard_bp.get("/scans/<int:scan_id>/report")
 @login_required
 def embedded_report(scan_id: int):
@@ -177,45 +176,7 @@ def embedded_report(scan_id: int):
     allowed_root = Path(current_app.config["SCAN_OUTPUT_DIR"]).resolve()
     if allowed_root not in report_path.parents:
         abort(403)
-    response = Response(report_path.read_text(encoding="utf-8"), mimetype="text/html")
-    response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-        "font-src 'self' https://fonts.gstatic.com; "
-        "object-src 'none'; "
-        "base-uri 'none'"
-    )
-    return response
-
-
-@dashboard_bp.get("/scans/<int:scan_id>/report/token")
-def embedded_report_token(scan_id: int):
-    token = request.args.get("token", "")
-    user_id = _verify_report_token(token, scan_id)
-    if user_id is None:
-        abort(403)
-    scan = Scan.query.join(Target).filter(Scan.id == scan_id, Target.user_id == user_id).first_or_404()
-    payload = scan_payload(scan)
-    path = first_report_path(payload)
-    if not path:
-        return Response(f"<pre>{json.dumps(payload, indent=2, ensure_ascii=False)}</pre>", mimetype="text/html")
-    report_path = Path(path).resolve()
-    allowed_root = Path(current_app.config["SCAN_OUTPUT_DIR"]).resolve()
-    if allowed_root not in report_path.parents:
-        abort(403)
-    response = Response(report_path.read_text(encoding="utf-8"), mimetype="text/html")
-    response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-        "font-src 'self' https://fonts.gstatic.com; "
-        "object-src 'none'; "
-        "base-uri 'none'"
-    )
-    return response
+    return _build_report_response(report_path.read_text(encoding="utf-8"))
 
 
 @dashboard_bp.get("/alerts")

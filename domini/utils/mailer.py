@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import smtplib
 from datetime import datetime, timezone
@@ -20,8 +21,9 @@ def send_reset_email(email: str, token: str, base_url: str) -> None:
         pending_log = Path(__file__).resolve().parents[2] / "instance" / "pending_resets.log"
         pending_log.parent.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now(timezone.utc).isoformat()
+        email_prefix = hashlib.sha256(email.encode()).hexdigest()[:12]
         with pending_log.open("a", encoding="utf-8") as output:
-            output.write(f"[{timestamp}] password reset requested for email={email}\n")
+            output.write(f"[{timestamp}] password reset requested for email_sha256_prefix={email_prefix}\n")
         return
 
     message = EmailMessage()

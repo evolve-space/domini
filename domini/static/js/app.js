@@ -46,7 +46,6 @@ function applyLanguage(lang) {
 
 async function persistLanguage(lang) {
     const response = await fetch(`/i18n/${lang}`, {
-        method: "POST",
         headers: {
             "Accept": "application/json",
         },
@@ -119,6 +118,7 @@ if (scanForm) {
             headers: {
                 "Accept": "application/json",
                 "Content-Type": "application/json",
+                "X-CSRF-Token": csrfToken,
             },
             body: JSON.stringify({ target }),
         });

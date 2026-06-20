@@ -35,10 +35,16 @@ def require_csrf() -> None:
     submitted = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
     if not expected or not submitted or not secrets.compare_digest(submitted, expected):
         abort(403)
+    session["csrf_token"] = secrets.token_hex(32)
 
 
 def valid_password(password: str) -> bool:
-    return len(password) >= 8 and any(character.isalpha() for character in password) and any(character.isdigit() for character in password)
+    return (
+        len(password) >= 12
+        and any(c.isalpha() for c in password)
+        and any(c.isdigit() for c in password)
+        and any(not c.isalnum() for c in password)
+    )
 
 
 def remote_ip() -> str:
@@ -84,10 +90,7 @@ def login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         user = User.query.filter_by(username=username).first()
-        if user and user.is_locked():
-            flash(g.t["account_locked"].format(minutes=locked_minutes(user)), "error")
-            return render_template("login.html", register_enabled=bool(Config.INVITE_CODE))
-        if user and user.check_password(password):
+        if user and not user.is_locked() and user.check_password(password):
             user.reset_failed_attempts()
             LoginAttempt.query.filter_by(ip_hash=_ip_hash()).delete()
             db.session.commit()
@@ -121,6 +124,9 @@ def register():
 
     if request.method == "POST":
         require_csrf()
+        if current_ip_attempts() >= Config.LOGIN_RATE_LIMIT_ATTEMPTS:
+            flash(g.t["account_locked"].format(minutes=5), "error")
+            return render_template("login.html", register_mode=True)
         username = request.form.get("username", "").strip()
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
@@ -157,12 +163,17 @@ def register():
 def forgot_password():
     if request.method == "POST":
         require_csrf()
+        if current_ip_attempts() >= Config.LOGIN_RATE_LIMIT_ATTEMPTS:
+            flash(g.t["account_locked"].format(minutes=5), "error")
+            return render_template("forgot_password.html")
         email = request.form.get("email", "").strip().lower()
         user = User.query.filter_by(email=email).first()
         if user:
             token, raw_token = PasswordResetToken.create_for_user(user.id)
             db.session.add(token)
-            db.session.commit()
+        db.session.add(LoginAttempt(ip_hash=_ip_hash(), attempted_at=utcnow()))
+        db.session.commit()
+        if user:
             send_reset_email(user.email, raw_token, request.url_root.rstrip("/"))
         flash("reset_email_sent", "success")
     return render_template("forgot_password.html")

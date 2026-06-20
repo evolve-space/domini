@@ -6,7 +6,7 @@ from secrets import randbits
 from OpenSSL import crypto
 from flask import Flask, g, jsonify, redirect, request, session, url_for
 
-from config import Config, TRANSLATIONS
+from config import Config, TRANSLATIONS, validate_secrets
 from domini.extensions import bcrypt, db, login_manager
 from domini.extensions import migrate_sqlite_user_columns
 from translations import LANGUAGES
@@ -88,6 +88,8 @@ def create_admin_user() -> None:
 
 
 def create_app() -> Flask:
+    validate_secrets()
+
     app = Flask(
         __name__,
         instance_relative_config=True,
@@ -168,7 +170,7 @@ def create_app() -> Flask:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
 
-    @app.post("/i18n/<lang>")
+    @app.get("/i18n/<lang>")
     def set_language(lang: str):
         if lang not in TRANSLATIONS:
             return jsonify({"error": "unsupported_language"}), 400
@@ -181,8 +183,7 @@ def create_app() -> Flask:
     with app.app_context():
         from domini.models import LoginAttempt, PasswordResetToken  # noqa: F401
 
-        os.makedirs("/tmp/scan_reports", exist_ok=True)
-        os.makedirs(str(Path(app.config.get("SCAN_OUTPUT_DIR", "/tmp/scan_reports"))), exist_ok=True)
+        os.makedirs(str(app.config["SCAN_OUTPUT_DIR"]), exist_ok=True)
         migrate_sqlite_user_columns(Path(__file__).resolve().parent / "instance" / "domini.db")
         db.create_all()
         create_admin_user()
@@ -195,4 +196,4 @@ app = create_app()
 
 if __name__ == "__main__":
     cert_path, key_path = create_self_signed_cert(Path("certs"))
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8443)))
+    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", 8443)), ssl_context=(cert_path, key_path))

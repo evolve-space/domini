@@ -21,6 +21,28 @@ if not _database_url:
     _database_url = f"sqlite:///{_instance_dir / 'domini.db'}"
 
 
+_WEAK_ADMIN_PASSWORDS = {"domini2024", "password", "admin", ""}
+
+
+def validate_secrets() -> None:
+    """Abort startup when weak credentials are detected outside dev mode."""
+    dev_mode = os.getenv("FLASK_ENV", "production").lower() == "development"
+    if dev_mode:
+        return
+    pwd = os.getenv("ADMIN_PASSWORD", "")
+    errors: list[str] = []
+    if pwd in _WEAK_ADMIN_PASSWORDS:
+        errors.append("ADMIN_PASSWORD must not be a well-known default value.")
+    if len(pwd) < 16:
+        errors.append("ADMIN_PASSWORD must be at least 16 characters.")
+    if errors:
+        for msg in errors:
+            logging.getLogger(__name__).critical("Security misconfiguration: %s", msg)
+        raise SystemExit(
+            "Startup aborted: insecure ADMIN_PASSWORD. Set FLASK_ENV=development to bypass (dev only)."
+        )
+
+
 class Config:
     SECRET_KEY = SECRET_KEY
     SQLALCHEMY_DATABASE_URI = _database_url
