@@ -3,13 +3,14 @@ from __future__ import annotations
 import hashlib
 import re
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from config import Config
 from domini.extensions import db
+from domini.models.attempt import LoginAttempt
 from domini.models.token import PasswordResetToken
 from domini.models.user import User
 from domini.utils.mailer import send_reset_email
@@ -17,7 +18,6 @@ from domini.utils.mailer import send_reset_email
 auth_bp = Blueprint("auth", __name__)
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
 EMAIL_RE = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
-LOGIN_ATTEMPTS: dict[str, list[datetime]] = {}
 
 
 def utcnow() -> datetime:
@@ -32,7 +32,7 @@ def get_csrf_token() -> str:
 
 def require_csrf() -> None:
     expected = session.get("csrf_token")
-    submitted = request.form.get("csrf_token")
+    submitted = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
     if not expected or not submitted or not secrets.compare_digest(submitted, expected):
         abort(403)
 
@@ -45,11 +45,19 @@ def remote_ip() -> str:
     return request.remote_addr or "unknown"
 
 
-def current_ip_attempts() -> list[datetime]:
-    cutoff = utcnow().timestamp() - Config.LOGIN_RATE_LIMIT_WINDOW_SECONDS
-    attempts = [timestamp for timestamp in LOGIN_ATTEMPTS.get(remote_ip(), []) if timestamp.timestamp() > cutoff]
-    LOGIN_ATTEMPTS[remote_ip()] = attempts
-    return attempts
+def _ip_hash() -> str:
+    return hashlib.sha256(remote_ip().encode()).hexdigest()
+
+
+def current_ip_attempts() -> int:
+    ip_hash = _ip_hash()
+    cutoff = utcnow() - timedelta(seconds=Config.LOGIN_RATE_LIMIT_WINDOW_SECONDS)
+    LoginAttempt.query.filter(
+        LoginAttempt.ip_hash == ip_hash,
+        LoginAttempt.attempted_at <= cutoff,
+    ).delete()
+    db.session.commit()
+    return LoginAttempt.query.filter_by(ip_hash=ip_hash).count()
 
 
 def locked_minutes(user: User) -> int:
@@ -69,7 +77,7 @@ def login():
 
     if request.method == "POST":
         require_csrf()
-        if len(current_ip_attempts()) >= Config.LOGIN_RATE_LIMIT_ATTEMPTS:
+        if current_ip_attempts() >= Config.LOGIN_RATE_LIMIT_ATTEMPTS:
             flash(g.t["account_locked"].format(minutes=5), "error")
             return render_template("login.html", register_enabled=bool(Config.INVITE_CODE))
 
@@ -81,24 +89,25 @@ def login():
             return render_template("login.html", register_enabled=bool(Config.INVITE_CODE))
         if user and user.check_password(password):
             user.reset_failed_attempts()
+            LoginAttempt.query.filter_by(ip_hash=_ip_hash()).delete()
             db.session.commit()
-            LOGIN_ATTEMPTS.pop(remote_ip(), None)
             login_user(user, remember=False)
             session.permanent = True
             session["_login_at"] = utcnow().isoformat()
             return redirect(url_for("dashboard.index"))
         if user:
             user.register_failed_attempt()
-            db.session.commit()
-        current_ip_attempts().append(utcnow())
+        db.session.add(LoginAttempt(ip_hash=_ip_hash(), attempted_at=utcnow()))
+        db.session.commit()
         flash("invalid_credentials", "error")
 
     return render_template("login.html", register_enabled=bool(Config.INVITE_CODE))
 
 
-@auth_bp.route("/logout")
+@auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
+    require_csrf()
     session.clear()
     logout_user()
     return redirect(url_for("auth.login"))

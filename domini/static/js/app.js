@@ -1,6 +1,8 @@
 const translationsElement = document.getElementById("domini-i18n");
 const translations = translationsElement ? JSON.parse(translationsElement.textContent) : {};
 
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? "";
+
 function interpolate(text, element) {
     return text.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key) => {
         const value = element.dataset[`i18n${key.charAt(0).toUpperCase()}${key.slice(1)}`];
@@ -144,7 +146,7 @@ if (rescanButton) {
     rescanButton.addEventListener("click", async () => {
         const response = await fetch(`/targets/${rescanButton.dataset.targetId}/rescan`, {
             method: "POST",
-            headers: { "Accept": "application/json" },
+            headers: { "Accept": "application/json", "X-CSRF-Token": csrfToken },
         });
         if (!response.ok) {
             return;
@@ -193,7 +195,7 @@ document.documentElement.dataset.ready = "true";
     modal.addEventListener("close", async function () {
         if (modal.returnValue !== "confirm" || !pendingId) return;
         try {
-            const resp = await fetch("/targets/" + pendingId, { method: "DELETE" });
+            const resp = await fetch("/targets/" + pendingId, { method: "DELETE", headers: { "X-CSRF-Token": csrfToken } });
             if (resp.ok && pendingRow) pendingRow.remove();
         } catch (err) {
             console.error(err);
@@ -214,7 +216,7 @@ document.documentElement.dataset.ready = "true";
     modal.addEventListener("close", async function () {
         if (modal.returnValue !== "confirm") return;
         try {
-            const resp = await fetch("/targets/" + btn.dataset.targetId, { method: "DELETE" });
+            const resp = await fetch("/targets/" + btn.dataset.targetId, { method: "DELETE", headers: { "X-CSRF-Token": csrfToken } });
             if (resp.ok) window.location.href = "/dashboard";
         } catch (err) {
             console.error(err);

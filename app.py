@@ -154,6 +154,16 @@ def create_app() -> Flask:
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        if "Content-Security-Policy" not in response.headers:
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' https://cdn.jsdelivr.net; "
+                "style-src 'self' https://fonts.googleapis.com; "
+                "font-src 'self' https://fonts.gstatic.com; "
+                "connect-src 'self' https://cdn.jsdelivr.net; "
+                "object-src 'none'; "
+                "base-uri 'self'"
+            )
         if not app.debug:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
@@ -169,7 +179,7 @@ def create_app() -> Flask:
     app.register_blueprint(dashboard_bp)
 
     with app.app_context():
-        from domini.models import PasswordResetToken  # noqa: F401
+        from domini.models import LoginAttempt, PasswordResetToken  # noqa: F401
 
         os.makedirs("/tmp/scan_reports", exist_ok=True)
         os.makedirs(str(Path(app.config.get("SCAN_OUTPUT_DIR", "/tmp/scan_reports"))), exist_ok=True)

@@ -1,10 +1,12 @@
 import json
+import re
 from pathlib import Path
 
 from flask import Blueprint, Response, abort, current_app, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
+from domini.auth.routes import require_csrf
 from domini.extensions import db
 from domini.models.scan import Alert, Scan, Target
 from domini.scans.service import (
@@ -25,7 +27,7 @@ from domini.scans.service import (
 dashboard_bp = Blueprint("dashboard", __name__)
 
 _REPORT_TOKEN_SALT = "report-token-v1"
-_REPORT_TOKEN_TTL = 3600  # 1 hour
+_REPORT_TOKEN_TTL = 300  # 5 minutes
 
 
 def _make_report_token(scan_id: int, user_id: int) -> str:
@@ -112,6 +114,7 @@ def scan_status(scan_id: int):
 @dashboard_bp.delete("/targets/<int:target_id>")
 @login_required
 def delete_target(target_id: int):
+    require_csrf()
     target = Target.query.filter_by(id=target_id, user_id=current_user.id).first_or_404()
     db.session.delete(target)
     db.session.commit()
@@ -121,6 +124,7 @@ def delete_target(target_id: int):
 @dashboard_bp.post("/targets/<int:target_id>/rescan")
 @login_required
 def rescan_target(target_id: int):
+    require_csrf()
     target = Target.query.filter_by(id=target_id, user_id=current_user.id).first_or_404()
     scan = start_scan_for_target(current_app._get_current_object(), target)
     return jsonify(get_status(scan)), 202
@@ -141,7 +145,6 @@ def target_detail(target_id: int):
     payload = scan_payload(scan) if scan else {}
     findings = localize_findings(collect_findings(payload), g.lang)
     report_available = bool(first_report_path(payload))
-    report_token = _make_report_token(scan.id, current_user.id) if scan and report_available else None
     return render_template(
         "target_detail.html",
         target=target,
@@ -157,7 +160,6 @@ def target_detail(target_id: int):
         exposed_secret_findings=exposed_secret_findings(payload),
         supply_chain_findings=supply_chain_findings(payload),
         report_available=report_available,
-        report_token=report_token,
         report_title=report_title(payload),
         raw_json=json.dumps(payload, indent=2, ensure_ascii=False),
     )
@@ -177,7 +179,13 @@ def embedded_report(scan_id: int):
         abort(403)
     response = Response(report_path.read_text(encoding="utf-8"), mimetype="text/html")
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers.pop("Content-Security-Policy", None)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "object-src 'none'; "
+        "base-uri 'none'"
+    )
     return response
 
 
@@ -198,7 +206,13 @@ def embedded_report_token(scan_id: int):
         abort(403)
     response = Response(report_path.read_text(encoding="utf-8"), mimetype="text/html")
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers.pop("Content-Security-Policy", None)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "object-src 'none'; "
+        "base-uri 'none'"
+    )
     return response
 
 
@@ -234,10 +248,11 @@ def export_target(target_id: int):
         raw_json=json.dumps(payload, indent=2, ensure_ascii=False),
     )
     filename = f"domini-{target.name.replace('.', '-')}-scan-{scan.id}.html"
+    safe_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
     return Response(
         html,
         mimetype="text/html",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
     )
 
 

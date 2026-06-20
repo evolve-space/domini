@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -53,7 +54,8 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     html_path = ReportGenerator(output_dir=str(output_dir)).build(results)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    json_path = output_dir / f"dominus-{args.target}-{stamp}.json"
+    safe_target = re.sub(r'[^a-z0-9.\-_]', '_', args.target)
+    json_path = output_dir / f"dominus-{safe_target}-{stamp}.json"
     json_path.write_text(json.dumps(results, indent=2, default=str, ensure_ascii=False), encoding="utf-8")
     results["artifacts"] = {"html": str(html_path.resolve()), "json": str(json_path.resolve())}
 

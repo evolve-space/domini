@@ -21,7 +21,7 @@ def send_reset_email(email: str, token: str, base_url: str) -> None:
         pending_log.parent.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now(timezone.utc).isoformat()
         with pending_log.open("a", encoding="utf-8") as output:
-            output.write(f"[{timestamp}] email={email} link={link}\n")
+            output.write(f"[{timestamp}] password reset requested for email={email}\n")
         return
 
     message = EmailMessage()

@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title data-i18n="page_title">{{ g.t.page_title }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +26,10 @@
                     </div>
                     {% if current_user.is_authenticated %}
                         <span class="user-pill mono">{{ current_user.username }}</span>
-                        <a class="logout-link" href="{{ url_for('auth.logout') }}" title="{{ g.t.logout_tooltip }}" data-i18n="logout" data-i18n-title="logout_tooltip">{{ g.t.logout }}</a>
+                        <form class="logout-form" method="POST" action="{{ url_for('auth.logout') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="logout-link" title="{{ g.t.logout_tooltip }}" data-i18n="logout" data-i18n-title="logout_tooltip">{{ g.t.logout }}</button>
+                        </form>
                     {% endif %}
                 </nav>
             </header>
@@ -51,7 +55,9 @@
             </footer>
         {% endblock %}
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"
+            integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ"
+            crossorigin="anonymous"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

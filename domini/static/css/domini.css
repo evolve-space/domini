@@ -157,6 +157,9 @@ a {
     color: #ffffff;
 }
 
+.logout-form { display: inline; }
+button.logout-link { cursor: pointer; font: inherit; }
+
 .page {
     width: min(1180px, calc(100% - 32px));
     flex: 1;
