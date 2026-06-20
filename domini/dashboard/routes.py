@@ -182,7 +182,7 @@ def embedded_report(scan_id: int):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "object-src 'none'; "
         "base-uri 'none'"
     )
@@ -209,7 +209,7 @@ def embedded_report_token(scan_id: int):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "object-src 'none'; "
         "base-uri 'none'"
     )
