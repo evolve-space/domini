@@ -183,6 +183,7 @@ def embedded_report(scan_id: int):
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
         "object-src 'none'; "
         "base-uri 'none'"
     )
@@ -210,6 +211,7 @@ def embedded_report_token(scan_id: int):
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
         "object-src 'none'; "
         "base-uri 'none'"
     )
