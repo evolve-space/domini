@@ -5,7 +5,17 @@ import socket
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import BaseHandler, HTTPRedirectHandler, Request, build_opener, urlopen
+
+
+class _NoRedirectHandler(BaseHandler):
+    def http_error_301(self, req, fp, code, msg, headers):  # noqa: ANN001
+        raise HTTPError(req.full_url, code, msg, headers, fp)
+
+    http_error_302 = http_error_303 = http_error_307 = http_error_308 = http_error_301
+
+
+_no_redirect_opener = build_opener(_NoRedirectHandler())
 
 SUSPICIOUS_PREFIXES = ("staging-", "dev-", "test-", "old-", "backup-", "admin-")
 TIMEOUT = 20
@@ -131,7 +141,7 @@ def bucket_candidates(domain: str) -> list[str]:
 def public_bucket_status(url: str) -> str:
     request = Request(url, headers={"User-Agent": "DOMINI-ShadowIT/0.1"})
     try:
-        with urlopen(request, timeout=TIMEOUT) as response:
+        with _no_redirect_opener.open(request, timeout=TIMEOUT) as response:
             body = response.read(300).decode("utf-8", errors="replace")
             if response.status == 200 and "AccessDenied" not in body:
                 return "public"

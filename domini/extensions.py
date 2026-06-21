@@ -22,6 +22,7 @@ def migrate_sqlite_user_columns(database_path: Path) -> None:
         "ALTER TABLE user ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE user ADD COLUMN locked_until DATETIME",
         "ALTER TABLE user ADD COLUMN created_at DATETIME",
+        "ALTER TABLE user ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0",
     )
     with sqlite3.connect(database_path) as connection:
         for statement in statements:

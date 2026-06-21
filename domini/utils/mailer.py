@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import hashlib
+import logging
+import logging.handlers
 import os
 import smtplib
 from datetime import datetime, timezone
 from email.message import EmailMessage
 from pathlib import Path
 
+from config import Config
 
-def send_reset_email(email: str, token: str, base_url: str) -> None:
-    link = f"{base_url.rstrip('/')}/reset-password/{token}"
+
+def send_reset_email(email: str, token: str) -> None:
+    base_url = Config.APP_BASE_URL.rstrip("/")
+    link = f"{base_url}/reset-password/{token}"
     mail_settings = {
         "server": os.getenv("MAIL_SERVER"),
         "port": os.getenv("MAIL_PORT"),
@@ -22,8 +27,14 @@ def send_reset_email(email: str, token: str, base_url: str) -> None:
         pending_log.parent.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now(timezone.utc).isoformat()
         email_prefix = hashlib.sha256(email.encode()).hexdigest()[:12]
-        with pending_log.open("a", encoding="utf-8") as output:
-            output.write(f"[{timestamp}] password reset requested for email_sha256_prefix={email_prefix}\n")
+        _reset_logger = logging.getLogger("domini.pending_resets")
+        if not _reset_logger.handlers:
+            _handler = logging.handlers.RotatingFileHandler(
+                str(pending_log), maxBytes=1_048_576, backupCount=5, encoding="utf-8"
+            )
+            _reset_logger.addHandler(_handler)
+            _reset_logger.setLevel(logging.INFO)
+        _reset_logger.info("[%s] password reset requested for email_sha256_prefix=%s", timestamp, email_prefix)
         return
 
     message = EmailMessage()

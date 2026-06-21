@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from cachetools import TTLCache
 from flask import Flask
 
 from config import Config
@@ -18,7 +19,7 @@ from domini.models.scan import Alert, Scan, Target
 from domini.scanner import correlator, secrets, shadowit, supplychain
 
 RUNNER_DIR = Path(__file__).resolve().parent
-SCAN_STATUS: dict[int, dict[str, Any]] = {}
+SCAN_STATUS: TTLCache = TTLCache(maxsize=2048, ttl=3600)
 STATUS_LOCK = threading.Lock()
 HIGH_RISK_PORTS = {21, 23, 135, 139, 445, 1433, 1521, 3306, 3389, 5432, 5900, 6379, 9200, 11211, 27017}
 _TARGET_RE = re.compile(r'^(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$')

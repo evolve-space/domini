@@ -25,6 +25,7 @@ from domini.scans.service import (
 )
 
 dashboard_bp = Blueprint("dashboard", __name__)
+_MAX_CONCURRENT_SCANS = 3
 
 
 @dashboard_bp.route("/")
@@ -82,6 +83,13 @@ def create_scan():
     target = (data.get("target") or "").strip()
     if not target:
         return jsonify({"error": "missing_target"}), 400
+    active_count = (
+        Scan.query.join(Target)
+        .filter(Target.user_id == current_user.id, Scan.status.in_(["queued", "running"]))
+        .count()
+    )
+    if active_count >= _MAX_CONCURRENT_SCANS:
+        return jsonify({"error": "too_many_active_scans"}), 429
     scan = start_scan(current_app._get_current_object(), target, current_user.id)
     return jsonify(get_status(scan)), 202
 
@@ -149,7 +157,7 @@ def target_detail(target_id: int):
 
 def _build_report_response(html: str) -> Response:
     nonce = secrets.token_urlsafe(16)
-    html = re.sub(r'<(script|style)(?=[\s>])', lambda m: f'<{m.group(1)} nonce="{nonce}"', html)
+    html = re.sub(r'<(script|style)(?=[\s>])', lambda m: f'<{m.group(1)} nonce="{nonce}"', html, flags=re.IGNORECASE)
     response = Response(html, mimetype="text/html")
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Content-Security-Policy"] = (
@@ -158,7 +166,8 @@ def _build_report_response(html: str) -> Response:
         f"style-src 'self' 'nonce-{nonce}' https://fonts.googleapis.com; "
         f"font-src 'self' https://fonts.gstatic.com; "
         f"object-src 'none'; "
-        f"base-uri 'none'"
+        f"base-uri 'none'; "
+        f"frame-ancestors 'self'"
     )
     return response
 

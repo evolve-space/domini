@@ -60,6 +60,7 @@ class Config:
     SCAN_OUTPUT_DIR = Path(os.getenv("SCAN_OUTPUT_DIR", str(BASE_DIR / "instance" / "scan_reports")))
     SESSION_PERMANENT = True
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
+    APP_BASE_URL = os.getenv("APP_BASE_URL", "")
     INVITE_CODE = os.getenv("INVITE_CODE", "")
     LOGIN_RATE_LIMIT_ATTEMPTS = 10
     LOGIN_RATE_LIMIT_WINDOW_SECONDS = 300

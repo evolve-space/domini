@@ -32,7 +32,7 @@ class DependencyParser(HTMLParser):
 def scan(domain: str) -> dict[str, Any]:
     """Detect third-party technologies and external dependencies for a domain."""
     try:
-        response = requests.get(f"https://{domain}", timeout=TIMEOUT)
+        response = requests.get(f"https://{domain}", timeout=TIMEOUT, allow_redirects=False)
         findings: list[dict[str, str]] = []
         findings.extend(header_findings(response.headers))
         findings.extend(body_findings(response.text, domain))

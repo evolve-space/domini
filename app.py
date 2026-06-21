@@ -99,7 +99,7 @@ def create_app() -> Flask:
         static_folder="domini/static",
         template_folder="domini/templates",
     )
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
     app.config.from_object(Config)
 
     db.init_app(app)
@@ -109,13 +109,18 @@ def create_app() -> Flask:
     login_manager.login_message = "login_required"
 
     from domini.auth.routes import auth_bp
-    from domini.auth.routes import get_csrf_token
+    from domini.auth.routes import get_csrf_token, require_csrf
     from domini.dashboard.routes import dashboard_bp
     from domini.models.user import User
 
     @login_manager.user_loader
     def load_user(user_id: str) -> User | None:
-        return db.session.get(User, int(user_id))
+        user = db.session.get(User, int(user_id))
+        if user is None:
+            return None
+        if session.get("_session_version") != user.session_version:
+            return None
+        return user
 
     _SESSION_MAX_AGE = timedelta(hours=8)
 
@@ -186,8 +191,9 @@ def create_app() -> Flask:
             response.headers["Cache-Control"] = "no-store"
         return response
 
-    @app.get("/i18n/<lang>")
+    @app.post("/i18n/<lang>")
     def set_language(lang: str):
+        require_csrf()
         if lang not in TRANSLATIONS:
             return jsonify({"error": "unsupported_language"}), 400
         session["lang"] = lang

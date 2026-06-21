@@ -9,7 +9,7 @@ from flask import Blueprint, abort, flash, g, redirect, render_template, request
 from flask_login import current_user, login_required, login_user, logout_user
 
 from config import Config
-from domini.extensions import db
+from domini.extensions import bcrypt, db
 from domini.models.attempt import LoginAttempt
 from domini.models.token import PasswordResetToken
 from domini.models.user import User
@@ -17,6 +17,14 @@ from domini.utils.mailer import send_reset_email
 
 auth_bp = Blueprint("auth", __name__)
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
+_DUMMY_HASH: str = ""
+
+
+def _get_dummy_hash() -> str:
+    global _DUMMY_HASH
+    if not _DUMMY_HASH:
+        _DUMMY_HASH = bcrypt.generate_password_hash("x" * 32).decode()
+    return _DUMMY_HASH
 EMAIL_RE = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
 
 
@@ -31,6 +39,8 @@ def get_csrf_token() -> str:
 
 
 def require_csrf() -> None:
+    # Known limitation: rotating the token on each request invalidates tokens held by
+    # other tabs opened concurrently. A parallel POST from a second tab will receive 403.
     expected = session.get("csrf_token")
     submitted = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
     if not expected or not submitted or not secrets.compare_digest(submitted, expected):
@@ -90,6 +100,8 @@ def login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         user = User.query.filter_by(username=username).first()
+        if not user:
+            bcrypt.check_password_hash(_get_dummy_hash(), password)
         if user and not user.is_locked() and user.check_password(password):
             user.reset_failed_attempts()
             LoginAttempt.query.filter_by(ip_hash=_ip_hash()).delete()
@@ -97,6 +109,7 @@ def login():
             login_user(user, remember=False)
             session.permanent = True
             session["_login_at"] = utcnow().isoformat()
+            session["_session_version"] = user.session_version
             return redirect(url_for("dashboard.index"))
         if user:
             user.register_failed_attempt()
@@ -154,6 +167,7 @@ def register():
             login_user(user, remember=False)
             session.permanent = True
             session["_login_at"] = utcnow().isoformat()
+            session["_session_version"] = user.session_version
             return redirect(url_for("dashboard.index"))
 
     return render_template("login.html", register_mode=True)
@@ -174,7 +188,7 @@ def forgot_password():
         db.session.add(LoginAttempt(ip_hash=_ip_hash(), attempted_at=utcnow()))
         db.session.commit()
         if user:
-            send_reset_email(user.email, raw_token, request.url_root.rstrip("/"))
+            send_reset_email(user.email, raw_token)
         flash("reset_email_sent", "success")
     return render_template("forgot_password.html")
 
@@ -198,6 +212,7 @@ def reset_password(token: str):
         else:
             reset_token.user.set_password(password)
             reset_token.user.reset_failed_attempts()
+            reset_token.user.session_version = (reset_token.user.session_version or 0) + 1
             reset_token.used = True
             db.session.commit()
             flash("password_reset_success", "success")
