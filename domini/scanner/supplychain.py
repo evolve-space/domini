@@ -10,18 +10,23 @@ from urllib.parse import urlparse
 import requests
 
 TIMEOUT = 10
-_BLOCKED_IPS: frozenset[ipaddress.IPv4Address | ipaddress.IPv6Address] = frozenset({
-    ipaddress.ip_address("169.254.169.254"),
-    ipaddress.ip_address("127.0.0.1"),
-    ipaddress.ip_address("::1"),
-    ipaddress.ip_address("0.0.0.0"),
-})
+
+
+def _is_forbidden_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return (
+        addr.is_private
+        or addr.is_loopback
+        or addr.is_link_local
+        or addr.is_reserved
+        or addr.is_multicast
+        or addr.is_unspecified
+    )
 
 
 def _resolves_to_blocked(domain: str) -> bool:
     try:
         for info in socket.getaddrinfo(domain, None):
-            if ipaddress.ip_address(info[4][0]) in _BLOCKED_IPS:
+            if _is_forbidden_ip(ipaddress.ip_address(info[4][0])):
                 return True
     except Exception:
         pass
