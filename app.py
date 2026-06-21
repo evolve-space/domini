@@ -166,6 +166,13 @@ def create_app() -> Flask:
     app.jinja_env.filters["safe_url"] = _safe_url
 
     @app.after_request
+    def inject_new_csrf_token(response):
+        new_token = getattr(g, "new_csrf_token", None)
+        if new_token:
+            response.headers["X-New-CSRF-Token"] = new_token
+        return response
+
+    @app.after_request
     def add_security_headers(response):
         from flask_login import current_user
         if "X-Frame-Options" not in response.headers:

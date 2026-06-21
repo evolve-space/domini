@@ -45,7 +45,9 @@ def require_csrf() -> None:
     submitted = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
     if not expected or not submitted or not secrets.compare_digest(submitted, expected):
         abort(403)
-    session["csrf_token"] = secrets.token_hex(32)
+    new_token = secrets.token_hex(32)
+    session["csrf_token"] = new_token
+    g.new_csrf_token = new_token
 
 
 def valid_password(password: str) -> bool:
@@ -183,6 +185,7 @@ def forgot_password():
         email = request.form.get("email", "").strip().lower()
         user = User.query.filter_by(email=email).first()
         if user:
+            PasswordResetToken.query.filter_by(user_id=user.id, used=False).update({"used": True})
             token, raw_token = PasswordResetToken.create_for_user(user.id)
             db.session.add(token)
         db.session.add(LoginAttempt(ip_hash=_ip_hash(), attempted_at=utcnow()))

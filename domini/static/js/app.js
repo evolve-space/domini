@@ -1,7 +1,14 @@
 const translationsElement = document.getElementById("domini-i18n");
 const translations = translationsElement ? JSON.parse(translationsElement.textContent) : {};
 
-const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? "";
+let csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? "";
+
+function updateCsrfFromResponse(response) {
+    const newToken = response.headers.get("X-New-CSRF-Token");
+    if (newToken) {
+        csrfToken = newToken;
+    }
+}
 
 function interpolate(text, element) {
     return text.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key) => {
@@ -46,14 +53,17 @@ function applyLanguage(lang) {
 
 async function persistLanguage(lang) {
     const response = await fetch(`/i18n/${lang}`, {
+        method: "POST",
         headers: {
             "Accept": "application/json",
+            "X-CSRF-Token": csrfToken,
         },
     });
 
     if (!response.ok) {
         throw new Error(`Unable to persist language: ${lang}`);
     }
+    updateCsrfFromResponse(response);
 }
 
 document.querySelectorAll(".lang-option").forEach((button) => {
@@ -126,6 +136,7 @@ if (scanForm) {
             setScanStatus({ status: "failed", phase: "" });
             return;
         }
+        updateCsrfFromResponse(response);
         const data = await response.json();
         setScanStatus(data);
         pollScan(data.id);
@@ -151,6 +162,7 @@ if (rescanButton) {
         if (!response.ok) {
             return;
         }
+        updateCsrfFromResponse(response);
         const data = await response.json();
         window.location.href = `/dashboard?scan_id=${data.id}`;
     });
@@ -196,6 +208,7 @@ document.documentElement.dataset.ready = "true";
         if (modal.returnValue !== "confirm" || !pendingId) return;
         try {
             const resp = await fetch("/targets/" + pendingId, { method: "DELETE", headers: { "X-CSRF-Token": csrfToken } });
+            if (resp.ok) updateCsrfFromResponse(resp);
             if (resp.ok && pendingRow) pendingRow.remove();
         } catch (err) {
             console.error(err);
@@ -217,7 +230,7 @@ document.documentElement.dataset.ready = "true";
         if (modal.returnValue !== "confirm") return;
         try {
             const resp = await fetch("/targets/" + btn.dataset.targetId, { method: "DELETE", headers: { "X-CSRF-Token": csrfToken } });
-            if (resp.ok) window.location.href = "/dashboard";
+            if (resp.ok) { updateCsrfFromResponse(resp); window.location.href = "/dashboard"; }
         } catch (err) {
             console.error(err);
         }
