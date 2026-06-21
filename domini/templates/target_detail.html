@@ -283,7 +283,7 @@
                     <tbody>
                         {% for finding in exposed_secret_findings %}
                             <tr>
-                                <td><a class="target-link" href="{{ finding.url }}" target="_blank" rel="noopener noreferrer">{{ finding.url }}</a></td>
+                                <td><a class="target-link" href="{{ finding.url | safe_url }}" target="_blank" rel="noopener noreferrer">{{ finding.url }}</a></td>
                                 <td>{{ finding.secret_type }}</td>
                                 <td><span class="severity severity-{{ finding.severity }}">{{ finding.severity }}</span></td>
                             </tr>

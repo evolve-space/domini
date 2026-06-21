@@ -5,6 +5,7 @@ from secrets import randbits
 
 from OpenSSL import crypto
 from flask import Flask, g, jsonify, redirect, request, session, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config, TRANSLATIONS, validate_secrets
 from domini.extensions import bcrypt, db, login_manager
@@ -79,6 +80,8 @@ def create_admin_user() -> None:
 
     admin = User.query.filter_by(username=Config.ADMIN_USERNAME).first()
     if admin:
+        admin.set_password(Config.ADMIN_PASSWORD)
+        db.session.commit()
         return
 
     admin = User(username=Config.ADMIN_USERNAME)
@@ -96,6 +99,7 @@ def create_app() -> Flask:
         static_folder="domini/static",
         template_folder="domini/templates",
     )
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     app.config.from_object(Config)
 
     db.init_app(app)
@@ -149,8 +153,16 @@ def create_app() -> Flask:
 
     app.jinja_env.globals["csrf_token"] = get_csrf_token
 
+    def _safe_url(url: object) -> str:
+        if isinstance(url, str) and url.startswith("https://"):
+            return url
+        return ""
+
+    app.jinja_env.filters["safe_url"] = _safe_url
+
     @app.after_request
     def add_security_headers(response):
+        from flask_login import current_user
         if "X-Frame-Options" not in response.headers:
             response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -162,12 +174,16 @@ def create_app() -> Flask:
                 "script-src 'self' https://cdn.jsdelivr.net; "
                 "style-src 'self' https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com; "
-                "connect-src 'self' https://cdn.jsdelivr.net; "
+                "connect-src 'self'; "
+                "form-action 'self'; "
+                "frame-ancestors 'none'; "
                 "object-src 'none'; "
                 "base-uri 'self'"
             )
         if not app.debug:
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+        if current_user.is_authenticated:
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     @app.get("/i18n/<lang>")

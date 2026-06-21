@@ -29,7 +29,7 @@ class PasswordResetToken(db.Model):
         token = PasswordResetToken(
             user_id=user_id,
             token_hash=hashed,
-            expires_at=utcnow() + timedelta(hours=1),
+            expires_at=utcnow() + timedelta(minutes=15),
         )
         return token, raw
 

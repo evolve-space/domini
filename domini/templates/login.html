@@ -57,7 +57,9 @@
             <a href="{{ url_for('auth.login') }}" data-i18n="already_have_account">{{ g.t.already_have_account }}</a>
         {% else %}
             <a href="{{ url_for('auth.forgot_password') }}" data-i18n="forgot_password">{{ g.t.forgot_password }}</a>
-            <a href="{{ url_for('auth.register') }}" data-i18n="need_account">{{ g.t.need_account }}</a>
+            {% if register_enabled %}
+                <a href="{{ url_for('auth.register') }}" data-i18n="need_account">{{ g.t.need_account }}</a>
+            {% endif %}
         {% endif %}
     </nav>
 </section>

@@ -176,10 +176,13 @@ def scan(domain: str) -> dict[str, Any]:
             secret_type = classify_secret(item)
             if not secret_type:
                 continue
+            url = item.get("html_url", "")
+            if not url.startswith("https://"):
+                continue
             fragments = _fragments_from_item(item)
             findings.append(
                 {
-                    "url": item.get("html_url", ""),
+                    "url": url,
                     "secret_type": secret_type,
                     "severity": severity_for_secret(secret_type, fragments),
                 }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import logging
 import re
 import subprocess
 import threading
@@ -110,14 +111,15 @@ def run_scan_job(app: Flask, scan_id: int) -> None:
             db.session.commit()
             set_status(scan.id, status="completed", phase=None, message="completed", risk_score=scan.risk_score)
         except Exception as exc:  # noqa: BLE001
+            logging.exception("Scan %s failed", scan_id)
             db.session.rollback()
             scan = db.session.get(Scan, scan_id)
             if scan:
                 scan.status = "failed"
                 scan.finished_at = utcnow()
-                scan.raw_json = json.dumps({"error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False)
+                scan.raw_json = json.dumps({"error": "scan_failed"}, ensure_ascii=False)
                 db.session.commit()
-            set_status(scan_id, status="failed", phase=None, message=str(exc))
+            set_status(scan_id, status="failed", phase=None, message="scan_failed")
 
 
 def run_domain_flow(scan: Scan) -> dict[str, Any]:

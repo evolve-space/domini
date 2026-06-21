@@ -149,8 +149,7 @@ def target_detail(target_id: int):
 
 def _build_report_response(html: str) -> Response:
     nonce = secrets.token_urlsafe(16)
-    html = html.replace("<script", f'<script nonce="{nonce}"')
-    html = html.replace("<style", f'<style nonce="{nonce}"')
+    html = re.sub(r'<(script|style)(?=[\s>])', lambda m: f'<{m.group(1)} nonce="{nonce}"', html)
     response = Response(html, mimetype="text/html")
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Content-Security-Policy"] = (

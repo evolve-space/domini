@@ -170,7 +170,7 @@ document.documentElement.dataset.ready = "true";
     const hint = document.getElementById("password-hint");
     if (!input || !hint) return;
     input.addEventListener("input", () => {
-        const valid = input.value.length >= 8 && /[A-Za-z]/.test(input.value) && /\d/.test(input.value);
+        const valid = input.value.length >= 12 && /[A-Za-z]/.test(input.value) && /\d/.test(input.value) && /[^A-Za-z0-9]/.test(input.value);
         hint.classList.toggle("is-valid", valid);
     });
 }());

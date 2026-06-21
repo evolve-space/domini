@@ -56,7 +56,7 @@ def fetch_crtsh_names(domain: str, errors: list[str]) -> list[str]:
             if response.status != 200:
                 errors.append(f"crt.sh: HTTP {response.status}")
                 return []
-            payload = json.loads(response.read().decode("utf-8", errors="replace"))
+            payload = json.loads(response.read(5 * 1024 * 1024).decode("utf-8", errors="replace"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
         errors.append(f"crt.sh: {type(exc).__name__}: {exc}")
         return []
@@ -78,7 +78,7 @@ def fetch_hackertarget_names(domain: str, errors: list[str]) -> list[str]:
     )
     try:
         with urlopen(request, timeout=TIMEOUT) as response:
-            body = response.read().decode("utf-8", errors="replace")
+            body = response.read(5 * 1024 * 1024).decode("utf-8", errors="replace")
     except (HTTPError, URLError, TimeoutError) as exc:
         errors.append(f"hackertarget: {type(exc).__name__}: {exc}")
         return []
