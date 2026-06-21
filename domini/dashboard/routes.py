@@ -1,3 +1,4 @@
+import html
 import json
 import re
 import secrets
@@ -179,7 +180,7 @@ def embedded_report(scan_id: int):
     payload = scan_payload(scan)
     path = first_report_path(payload)
     if not path:
-        return Response(f"<pre>{json.dumps(payload, indent=2, ensure_ascii=False)}</pre>", mimetype="text/html")
+        return Response(f"<pre>{html.escape(json.dumps(payload, indent=2, ensure_ascii=False))}</pre>", mimetype="text/html")
     report_path = Path(path).resolve()
     allowed_root = Path(current_app.config["SCAN_OUTPUT_DIR"]).resolve()
     if allowed_root not in report_path.parents:
