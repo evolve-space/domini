@@ -23,6 +23,12 @@ SCAN_STATUS: TTLCache = TTLCache(maxsize=2048, ttl=3600)
 STATUS_LOCK = threading.Lock()
 HIGH_RISK_PORTS = {21, 23, 135, 139, 445, 1433, 1521, 3306, 3389, 5432, 5900, 6379, 9200, 11211, 27017}
 _TARGET_RE = re.compile(r'^(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$')
+_BLOCKED_IPS: frozenset[ipaddress.IPv4Address | ipaddress.IPv6Address] = frozenset({
+    ipaddress.ip_address("169.254.169.254"),
+    ipaddress.ip_address("127.0.0.1"),
+    ipaddress.ip_address("::1"),
+    ipaddress.ip_address("0.0.0.0"),
+})
 
 
 def utcnow() -> datetime:
@@ -40,10 +46,13 @@ def detect_target_type(value: str) -> str:
 def start_scan(app: Flask, target_name: str, user_id: int) -> Scan:
     normalized = target_name.strip().lower()
     try:
-        ipaddress.ip_address(normalized)
+        addr = ipaddress.ip_address(normalized)
     except ValueError:
         if not _TARGET_RE.match(normalized):
             raise ValueError(f"Invalid target: {normalized!r}")
+    else:
+        if addr in _BLOCKED_IPS:
+            raise ValueError(f"Blocked target: {normalized!r}")
     target_type = detect_target_type(normalized)
     target = Target.query.filter_by(name=normalized, type=target_type, user_id=user_id).first()
     if target is None:

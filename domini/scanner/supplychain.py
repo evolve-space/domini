@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ipaddress
+import socket
 import ssl
 from html.parser import HTMLParser
 from typing import Any
@@ -8,6 +10,22 @@ from urllib.parse import urlparse
 import requests
 
 TIMEOUT = 10
+_BLOCKED_IPS: frozenset[ipaddress.IPv4Address | ipaddress.IPv6Address] = frozenset({
+    ipaddress.ip_address("169.254.169.254"),
+    ipaddress.ip_address("127.0.0.1"),
+    ipaddress.ip_address("::1"),
+    ipaddress.ip_address("0.0.0.0"),
+})
+
+
+def _resolves_to_blocked(domain: str) -> bool:
+    try:
+        for info in socket.getaddrinfo(domain, None):
+            if ipaddress.ip_address(info[4][0]) in _BLOCKED_IPS:
+                return True
+    except Exception:
+        pass
+    return False
 
 
 class DependencyParser(HTMLParser):
@@ -31,6 +49,9 @@ class DependencyParser(HTMLParser):
 
 def scan(domain: str) -> dict[str, Any]:
     """Detect third-party technologies and external dependencies for a domain."""
+    if _resolves_to_blocked(domain):
+        finding = {"type": "ssrf_risk", "provider": domain, "risk": "critical"}
+        return {"findings": [finding], "count": 1, "error": "ssrf_blocked"}
     try:
         response = requests.get(f"https://{domain}", timeout=TIMEOUT, allow_redirects=False)
         findings: list[dict[str, str]] = []
